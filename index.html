@@ -17,6 +17,34 @@
         #main-canvas {
             border: 1px solid black;
         }
+
+        .context-menu {
+            display: none;
+            position: absolute;
+            z-index: 10;
+
+            background-color: white;
+            border: 1px solid black;
+        }
+
+        .context-menu ul {
+            list-style: none;  
+            padding: 8px;
+            margin: 0px;
+        }
+
+        .context-menu ul li {
+            cursor: pointer;
+        }
+        
+        .context-menu ul li:hover {
+            background-color: rgb(200, 200, 200);
+        }
+
+        .context-menu.active {
+            display: block;
+        }
+
     </style>
     </head>
 
@@ -26,10 +54,16 @@
 
             <canvas id="main-canvas" width="640" height="480"></canvas>
 
-            <button>Play</button>
-            <button>Step</button>
+            <button id="play-btn">Play</button>
+            <button id="step-btn" accesskey="s">Step</button> 
+        </div>
 
-     
+
+        <div id='new-menu' class="context-menu"> 
+            <ul>
+                <li data-action="new-cell">New Cell</li>
+                <li data-action="new-branch">New Branch</li>
+            </ul>
         </div>
        
 

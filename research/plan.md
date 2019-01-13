@@ -61,5 +61,40 @@ render: state<t> -> state<t+1> -> View -> Canvas
 
 ```
 
+## Interaction
+
+Selection
+- drag rectangle to select cells and branches
+
+Create Cell/Branch
+- Right click with no selection, and pick "Create Cell/Branch"
+
+Delete Cell/branch
+- Right click with selection, and delete
+
+Create a fiber
+- each cell and branch shows the output slots 
+- the user clicks with their mouse on the area around the output,
+  and starts dragging to create a fiber. When they are over an input
+  area they release the mouse to create a connection.
+
+Delete a fiber
+- 
+
+
+Rotate a cell
+
+
+Adjust cell threshold
+
+
+
+
+
+
+
+
+
+
 
 
