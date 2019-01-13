@@ -14,6 +14,11 @@ Vec.prototype.len = function() {
     return Math.sqrt(this.lenSqr());
 }
 
+Vec.prototype.inRect = function(min, max) {
+    return this.x >= min.x && this.y >= min.y &&
+           this.x <= max.x && this.y <= max.y;  
+};
+
 Vec.prototype.inCircle = function(o, r) {
     return Vec.distSqr(this, o) < r * r;
 }
@@ -43,6 +48,20 @@ function CellView() {
     this.pos = new Vec(0, 0);
     this.size = 15.0;
 }
+
+CellView.prototype.hits = function(p) {
+    return p.inCircle(this.pos, this.size);
+}
+
+CellView.prototype.hitsConnectors = function(p) {
+    var offset = this.size + 10.0;
+    
+    if (this.hits(p)) {
+        return false;
+    }
+
+    return p.inRect(Vec.sub(this.pos, offset), Vec.add(this.pos, offset));
+};
 
 function BranchView() {
     this.pos = new Vec(0, 0);
@@ -196,17 +215,6 @@ function applySignals(net, state, signals) {
     return newState;
 }
 
-// returns both the state and the signals
-// the signals are not needed for the simulation
-// but are helpful for visualization
-/*
-function propogate(net, state) {
-    var fiberSignals = sendSignals(net, state);
-    var newState = applySignals(net, state, fiberSignals);
-    return [newState, fiberSignals];
-}
-*/
-
 // WINDOW AND CONTEXT
 // -------------------------
 
@@ -220,23 +228,37 @@ function Controller() {
 
     this.selection = [];
 
+    this.time = 0;
     this.play = true;
     this.playBtn = document.getElementById('play-btn');
     this.playBtn.onclick = (function(e) {
-        this.play = !this.play;
-
-        if (this.play) {
-            e.target.innerText = 'Pause';
-        } else {
-            e.target.innerText = 'Play';
-        }
+        this.togglePlay();
     }).bind(this);
 
     this.stepBtn = document.getElementById('step-btn');
     this.stepBtn.onclick = function(e) {
         step();
     };
+
+    this.resetBtn = document.getElementById('reset-btn');
+    this.resetBtn.onclick = (function(e) {
+        gState = [];
+        this.time = 0; 
+        this.timeDisplay.innerText = '0';
+    }).bind(this);
+
+    this.timeDisplay = document.getElementById('time'); 
 }
+
+Controller.prototype.togglePlay = function() {
+    this.play = !this.play;
+
+    if (this.play) {
+        this.playBtn.innerText = 'Pause';
+    } else {
+        this.playBtn.innerText = 'Play';
+    }
+};
 
 var gController = new Controller();
 
@@ -246,13 +268,23 @@ var gContextMenu = document.getElementById('new-menu');
 var gCtx = gCanvas.getContext('2d', { alpha: false });
 
 function keyDownHandler(e) {
-    console.log(e);
+    var num;
     if (e.key === 's') {
+        // step hotkey
         step();
+        e.preventDefault();
+    } else if (e.key === ' ') {
+        // play/pause hotkey  
+        gController.togglePlay();
+        e.preventDefault();
+    } else if (e.key.localeCompare('0') >= 0 && e.key.localeCompare('9') <= 0) {
+        // numbers for threshold
+        num = parseInt(e.key);
+        
+        e.preventDefault();
     }
-    if (e.key.localeCompare('0') >= 0 && e.key.localeCompare('9') <= 0) {
-        console.log(parseInt(e.key));
-    }
+
+
 }
 
 function getMousePos(canvas, e) {
@@ -264,13 +296,21 @@ function mouseDownHandler(e) {
     var mousePos = getMousePos(gCanvas, e);
 
     var hit = gNet.cells.find(function (cell) {
-        return mousePos.inCircle(cell.view.pos, cell.view.size);
+        return cell.view.hits(mousePos);
     });
     
     if (hit) {
         gController.dragInitial = mousePos;
         gController.dragStart = hit.view.pos;
         gController.selection = [hit];
+    }
+
+    var connectHit = gNet.cells.find(function (cell) {
+        return cell.view.hitsConnectors(mousePos);
+    });
+
+    if (connectHit) {
+        console.log('oh yeah');
     }
 }
 
@@ -377,6 +417,10 @@ function step() {
     gState = newState;
     gSignals = nextSignals;
     simDraw();
+
+
+    ++gController.time;
+    gController.timeDisplay.innerText = String(gController.time);
 }
 
 // RENDERER
