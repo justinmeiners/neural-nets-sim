@@ -1,3 +1,44 @@
+// VIEW
+// ------------------------
+
+function Vec(x, y) {
+    this.x = x;
+    this.y = y;
+}
+
+Vec.prototype.lenSqr = function() {
+    return this.x * this.x + this.y * this.y;
+}
+
+Vec.prototype.len = function() {
+    return Math.sqrt(this.lenSqr());
+}
+
+Vec.prototype.inCircle = function(o, r) {
+    return Vec.distSqr(this, o) < r * r;
+}
+
+Vec.prototype.add = function(b) {
+    this.x += b.x;
+    this.y += b.y;
+}
+
+Vec.add = function(a, b) {
+    return new Vec(a.x + b.x, a.y + b.y);
+}
+
+Vec.sub = function(a, b) {
+    return new Vec(a.x - b.x, a.y - b.y);
+}
+
+Vec.distSqr = function(a, b) {
+    return Vec.sub(a, b).lenSqr();
+}
+
+Vec.dist = function(a, b) {
+    return Math.sqrt(Vec.distSqr(a, b));
+}
+
 function CellView() {
     this.pos = new Vec(0, 0);
     this.size = 15.0;
@@ -9,6 +50,8 @@ function BranchView() {
 }
 
 
+// SIMULATION
+// ------------------------
 
 var INPUT_EXCITE = 0;
 var INPUT_INHIBIT = 1;
@@ -164,96 +207,128 @@ function propogate(net, state) {
 }
 */
 
-// VIEW
-// ------------------------
-
-function Vec(x, y) {
-    this.x = x;
-    this.y = y;
-}
-
-Vec.prototype.lenSqr = function() {
-    return this.x * this.x + this.y * this.y;
-}
-
-Vec.prototype.len = function() {
-    return Math.sqrt(this.lenSqr());
-}
-
-Vec.prototype.inCircle = function(o, r) {
-    return Vec.distSqr(this, o) < r * r;
-}
-
-Vec.prototype.add = function(b) {
-    this.x += b.x;
-    this.y += b.y;
-}
-
-Vec.add = function(a, b) {
-    return new Vec(a.x + b.x, a.y + b.y);
-}
-
-Vec.sub = function(a, b) {
-    return new Vec(a.x - b.x, a.y - b.y);
-}
-
-Vec.distSqr = function(a, b) {
-    return Vec.sub(a, b).lenSqr();
-}
-
-Vec.dist = function(a, b) {
-    return Math.sqrt(Vec.distSqr(a, b));
-}
-
-
 // WINDOW AND CONTEXT
 // -------------------------
 
+var STATE_SELECT = 0;
+var STATE_DRAG = 1;
+
+function Controller() {
+    this.state = STATE_SELECT;
+    this.dragInitial = new Vec(0, 0);
+    this.dragStart;
+
+    this.selection = [];
+
+    this.play = true;
+    this.playBtn = document.getElementById('play-btn');
+    this.playBtn.onclick = (function(e) {
+        this.play = !this.play;
+
+        if (this.play) {
+            e.target.innerText = 'Pause';
+        } else {
+            e.target.innerText = 'Play';
+        }
+    }).bind(this);
+
+    this.stepBtn = document.getElementById('step-btn');
+    this.stepBtn.onclick = function(e) {
+        step();
+    };
+}
+
+var gController = new Controller();
 
 var gCanvas = document.getElementById('main-canvas');
+var gContextMenu = document.getElementById('new-menu');
+
 var gCtx = gCanvas.getContext('2d', { alpha: false });
-var gWidth = 640;
-var gHeight = 480;
-var gDragging;
-var gDragInitial = new Vec(0, 0);
-var gDragStart;
+
+function keyDownHandler(e) {
+    console.log(e);
+    if (e.key === 's') {
+        step();
+    }
+    if (e.key.localeCompare('0') >= 0 && e.key.localeCompare('9') <= 0) {
+        console.log(parseInt(e.key));
+    }
+}
 
 function getMousePos(canvas, e) {
     var rect = canvas.getBoundingClientRect();
     return new Vec(e.clientX - rect.left, e.clientY - rect.top);
 }
 
-
 function mouseDownHandler(e) {
     var mousePos = getMousePos(gCanvas, e);
+
     var hit = gNet.cells.find(function (cell) {
         return mousePos.inCircle(cell.view.pos, cell.view.size);
     });
     
     if (hit) {
-        gDragInitial = mousePos;
-        gDragStart = hit.view.pos;
-        gDragging = hit; 
+        gController.dragInitial = mousePos;
+        gController.dragStart = hit.view.pos;
+        gController.selection = [hit];
     }
 }
 
 function mouseMoveHandler(e) {
+    var i;
+    var object;
     var mousePos = getMousePos(gCanvas, e);
-    var delta = Vec.sub(mousePos, gDragInitial);
-    if (gDragging) {
-        gDragging.view.pos = Vec.add(gDragStart, delta);
-    }
+    var delta = Vec.sub(mousePos, gController.dragInitial);
 
+    if (gController.selection.length > 0) {
+        for (i = 0; i < gController.selection.length; ++i) {
+            object = gController.selection[i];
+            object.view.pos = Vec.add(gController.dragStart, delta);
+        }
+    }
     simDraw();
 }
 
 function mouseUpHandler(e) {
-    gDragging = null;
+    gController.selection = [];
+    gContextMenu.classList.remove('active');
 }
 
 gCanvas.onmousedown = mouseDownHandler;
 gCanvas.onmousemove = mouseMoveHandler;
 gCanvas.onmouseup = mouseUpHandler;
+
+window.addEventListener('keydown', keyDownHandler);
+
+gCanvas.oncontextmenu = function(e) {
+    e.preventDefault();
+    gContextMenu.style.left = e.pageX + 'px';
+    gContextMenu.style.top = e.pageY + 'px';
+    gContextMenu.classList.add('active');
+};
+
+gContextMenu.onclick = function(e) {
+    var action;
+    var added;
+    var canvasLoc;
+    if (e.target.matches('li')) {
+        action = e.target.getAttribute('data-action');
+
+        canvasLoc = getMousePos(gCanvas, e);
+
+        if (action === 'new-cell') {
+            added = gNet.addCell();
+            added.view.pos = canvasLoc;
+        } else if (action === 'new-branch') {
+            added = gNet.addBranch();
+            added.view.pos = canvasLoc;
+        }
+
+        gContextMenu.classList.remove('active');
+    }
+};
+
+
 
 var gNet = new Net();
 
@@ -290,86 +365,107 @@ var gSignals = [];
 
 
 setInterval(function() {
+    if (gController.play) {
+        step();
+    }
+}, 500);
+
+function step() {
     var newState = applySignals(gNet, gState, gSignals);
     var nextSignals = sendSignals(gNet, newState, gSignals);
 
     gState = newState;
     gSignals = nextSignals;
     simDraw();
-}, 500);
+}
 
-
-function simClearCanvas() {
-    gCtx.fillStyle = '#D0E7F9';
-    gCtx.beginPath();
-    gCtx.rect(0, 0, gWidth, gHeight);
-    gCtx.closePath();
-    return gCtx.fill();
-};
-
+// RENDERER
+// --------------------------
+//
 function simDraw() {
-    simClearCanvas();
-
-    drawCells(gNet.cells);
+    clearCanvas(gCtx, gCanvas);
+    drawCells(gCtx, gNet, gState);
+    drawBranches(gCtx, gNet);
     drawFibers(gCtx, gNet, gSignals);
+}
 
-    /*
-    gNeurons.map(function (n) {
-        return drawNeuron(n, 20);
-    });
 
-    gCtx.fillStyle = '#000000';
-    return gNeurons.map(function (n) {
-        return drawNeuronText(n, 20);
-    });
-    */
-};
+function clearCanvas(ctx, canvas) {
+    ctx.fillStyle = '#D0E7F9';
+    ctx.beginPath();
+    ctx.rect(0, 0, canvas.width, canvas.height);
+    ctx.closePath();
+    return ctx.fill();
+}
 
-function drawCells(cells) {
+function drawCells(ctx, net, state) {
     var i;
     var cell;
 
     // draw the back of the cells
-    gCtx.strokeStyle = '#000000';
-    gCtx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.fillStyle = '#FFFFFF';
 
-    for (i = 0; i < cells.length; ++i)  { 
-        cell = cells[i];
+    // firing and quiet
+    drawCellPaths(ctx, net, state, false, false);
+    drawCellPaths(ctx, net, state, false, true);
 
-        gCtx.beginPath();
-        gCtx.arc(cell.view.pos.x, cell.view.pos.y, cell.view.size, Math.PI * 0.5, Math.PI * 1.5, false);
-
-        gCtx.fill();
-        gCtx.stroke();
-    }
 
     // draw the front of the cells
-    for (i = 0; i < cells.length; ++i)  { 
-        cell = cells[i];
+    // quiet
+    ctx.fillStyle = '#444444';
+    drawCellPaths(ctx, net, state, true, false);
 
-        if (gState[i]) {
-            gCtx.fillStyle = '#FF0000';
-        } else {
-            gCtx.fillStyle = '#444444';
-        }
-
-        gCtx.beginPath();
-        gCtx.arc(cell.view.pos.x, cell.view.pos.y, cell.view.size, Math.PI * 0.5, Math.PI * 1.5, true);
-
-        gCtx.fill();
-        gCtx.stroke();
-    }
-    
+    // firing
+    ctx.fillStyle = '#FF0000';
+    drawCellPaths(ctx, net, state, true, true);
+   
     // draw the text 
-    gCtx.fillStyle = '#000000';
-    gCtx.font = '14pt monospace';
-    gCtx.textAlign = "center";
-    gCtx.textBaseline = "middle"; 
+    ctx.fillStyle = '#000000';
+    ctx.font = '14pt monospace';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle"; 
 
-    for (i = 0; i < cells.length; ++i) {
-        cell = cells[i];
+    for (i = 0; i < net.cells.length; ++i) {
+        cell = net.cells[i];
 
-        gCtx.fillText(String(cell.threshold), cell.view.pos.x - cell.view.size * 0.5, cell.view.pos.y);
+        ctx.fillText(String(cell.threshold), cell.view.pos.x - cell.view.size * 0.5, cell.view.pos.y);
+    }
+}
+
+function drawCellPaths(ctx, net, state, front, active) {
+    var i;
+    var cell;
+    var cellFiring;
+
+    for (i = 0; i < net.cells.length; ++i)  { 
+        cell = net.cells[i];
+
+        cellFiring = state[i] ? true : false;
+
+        if (cellFiring === active) {
+            ctx.beginPath();
+            ctx.arc(cell.view.pos.x, cell.view.pos.y, cell.view.size, Math.PI * 0.5, Math.PI * 1.5, front);
+
+            ctx.fill();
+            ctx.stroke();
+        }
+   }
+}
+
+function drawBranches(ctx, net) {
+    var i;
+    var b;
+    ctx.strokeStyle = '#000000';
+    ctx.fillStyle = '#000000';
+
+    for (i = 0; i < net.branches.length; ++i) {
+        b = net.branches[i];
+        
+        ctx.beginPath(); 
+        ctx.arc(b.view.pos.x, b.view.pos.y, 5.0, 0.0, Math.PI * 2.0, false);
+        ctx.fill();
+        ctx.stroke();
     }
 }
 
