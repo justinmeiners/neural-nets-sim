@@ -23,11 +23,11 @@ function Branch() {
 // find an open slot in an array
 function insertionIndex(list) {
     var i;
-    var n = this.cells.length;
+    var n = list.length;
 
     // find an open slot
-    for (i = 0; i < this.cells.length; ++i) {
-        if (!this.cells[i]) {
+    for (i = 0; i < list.length; ++i) {
+        if (!list[i]) {
             n = i;
             break;
         }
@@ -44,17 +44,20 @@ function Net() {
 Net.prototype.addCell = function() {
     var cell = new Cell();
     this.cells.push(cell);
+    return cell;
 }
 
-Net.prototype.addFiber = function() {
+Net.prototype.addFiber = function(from, to) {
     var n = insertionIndex(this.fibers);
-    var fiber = new Fiber(n);
+    var fiber = new Fiber(n, from, to);
     this.fibers[n] = fiber;
+    return fiber;
 }
 
 Net.prototype.addBranch = function() {
     var branch = new Branch();
     this.branches.push(branch);
+    return branch;
 }
 
 
@@ -117,11 +120,11 @@ function applySignals(net, state, signals) {
             inputType = cell.inputTypes[j];
 
             if (signals[inputFiber.index]) {
-                if (inputType === INPUT_EXCITE) {
-                    ++activated;
-                } else {
+                if (inputType === INPUT_INHIBIT) {
                     inhibited = true;
-                    break;
+                    break; 
+                } else {
+                    ++activated;
                 }
             }
         }
@@ -131,6 +134,8 @@ function applySignals(net, state, signals) {
             newState[i] = true;
         }
     }
+
+    return newState;
 }
 
 
@@ -182,6 +187,12 @@ function CellView(cell) {
     this.size = 15.0;
 }
 
+function FiberView(fiber) {
+    this.fiber = fiber;
+    this.from = null;
+    this.to = null;
+}
+
 
 
 
@@ -224,7 +235,7 @@ function mouseMoveHandler(e) {
         gDragging.pos = Vec.add(gDragStart, delta);
     }
 
-    simLoop();
+    simDraw();
 }
 
 function mouseUpHandler(e) {
@@ -235,14 +246,54 @@ gCanvas.onmousedown = mouseDownHandler;
 gCanvas.onmousemove = mouseMoveHandler;
 gCanvas.onmouseup = mouseUpHandler;
 
-var testCell = new CellView();
+var net = new Net();
 
+var testCell = new CellView(net.addCell());
 testCell.pos.x = 40;
 testCell.pos.y = 50;
+testCell.cell.threshold = 0;
 
-var gCells = [testCell];
+var testCell2 = new CellView(net.addCell());
+testCell2.pos.x = 90;
+testCell2.pos.y = 50;
+
+var testCell3 = new CellView(net.addCell());
+testCell3.pos.x = 150;
+testCell3.pos.y = 50;
+
+var testFiber = new FiberView(net.addFiber(testCell.cell, testCell2.cell));
+testFiber.from = testCell;
+testFiber.to = testCell2;
+
+var testFiber2 = new FiberView(net.addFiber(testCell2.cell, testCell3.cell));
+testFiber2.from = testCell2;
+testFiber2.to = testCell3;
+
+var testFiber3 = new FiberView(net.addFiber(testCell3.cell, testCell.cell));
+testFiber3.from = testCell3;
+testFiber3.to = testCell;
 
 
+testCell.cell.output = testFiber.fiber;
+testCell2.cell.inputs.push(testFiber.fiber);
+
+testCell2.cell.output = testFiber2.fiber;
+testCell3.cell.inputs.push(testFiber2.fiber);
+
+testCell3.cell.output = testFiber3.fiber;
+testCell.cell.inputs.push(testFiber3.fiber);
+testCell.cell.inputTypes.push(INPUT_INHIBIT);
+
+
+var gCells = [testCell, testCell2, testCell3];
+var gFibers = [testFiber, testFiber2, testFiber3];
+
+var gState = [];
+
+setInterval(function() {
+    gState = propogate(net, gState);
+    simDraw();
+}, 500);
 
 
 function simClearCanvas() {
@@ -254,7 +305,10 @@ function simClearCanvas() {
 };
 
 function simDraw() {
+    simClearCanvas();
+
     drawCells(gCells);
+    drawFibers(gFibers);
 
     /*
     gNeurons.map(function (n) {
@@ -268,15 +322,11 @@ function simDraw() {
     */
 };
 
-function simLoop() {
-    simClearCanvas();
-    return simDraw();
-};
-
 function drawCells(cells) {
     var i;
     var cell;
-    // draw the front of the cells
+
+    // draw the back of the cells
     gCtx.strokeStyle = '#000000';
     gCtx.fillStyle = '#FFFFFF';
 
@@ -291,11 +341,16 @@ function drawCells(cells) {
     }
 
 
-    // draw the back of the cells
-    gCtx.fillStyle = '#444444';
+    // draw the front of the cells
 
     for (i = 0; i < cells.length; ++i)  { 
         cell = cells[i];
+
+        if (gState[i]) {
+            gCtx.fillStyle = '#FF0000';
+        } else {
+            gCtx.fillStyle = '#444444';
+        }
 
         gCtx.beginPath();
         gCtx.arc(cell.pos.x, cell.pos.y, cell.size, Math.PI * 0.5, Math.PI * 1.5, true);
@@ -310,15 +365,33 @@ function drawCells(cells) {
     gCtx.textAlign = "center";
     gCtx.textBaseline = "middle"; 
 
-    for (i = 0 ; i < cells.length; ++i) {
+    for (i = 0; i < cells.length; ++i) {
         cell = cells[i];
 
-        gCtx.fillText(String(3), cell.pos.x - cell.size * 0.5, cell.pos.y);
+        gCtx.fillText(String(cell.cell.threshold), cell.pos.x - cell.size * 0.5, cell.pos.y);
     }
 }
 
-simLoop();
+function drawFibers(fibers) {
+    var i;
+    var fiber;
+    gCtx.strokeStyle = '#000000';
+
+    for (i = 0; i < fibers.length; ++i) {
+        fiber = fibers[i];
+
+        gCtx.beginPath();
+        gCtx.moveTo(fiber.from.pos.x + fiber.from.size, fiber.from.pos.y);
+        gCtx.bezierCurveTo(fiber.from.pos.x + fiber.from.size + 50, fiber.from.pos.y,
+                      fiber.to.pos.x - fiber.to.size - 50, fiber.to.pos.y,
+                      fiber.to.pos.x - fiber.to.size, fiber.to.pos.y);
+
+        gCtx.stroke();
+                      
+
+    }
 
 
+}
 
 

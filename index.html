@@ -7,17 +7,33 @@
             font-family: Lucida Console, Courier, monospace;
         }
 
-        #main-canvas {
+        #content {
             display: block;
-            border: 1px solid black;
             margin-left: auto;
             margin-right: auto;
+            width: 640px;
+        }
+
+        #main-canvas {
+            border: 1px solid black;
         }
     </style>
     </head>
 
     <body>
-        <canvas id="main-canvas" width="640" height="480"></canvas>
+        <div id="content">
+            <h2>McCulloch &amp; Pitts Neural Net Simulator</h2>
+
+            <canvas id="main-canvas" width="640" height="480"></canvas>
+
+            <button>Play</button>
+            <button>Step</button>
+
+     
+        </div>
+       
+
+
         <script src="neural_nets.js"> </script>
     </body>
 </html>
