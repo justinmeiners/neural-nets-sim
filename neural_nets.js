@@ -46,21 +46,17 @@ Vec.dist = function(a, b) {
 
 function CellView() {
     this.pos = new Vec(0, 0);
-    this.size = 15.0;
 }
+
+CellView.prototype.size = 15.0;
 
 CellView.prototype.hits = function(p) {
     return p.inCircle(this.pos, this.size);
 }
 
 CellView.prototype.hitsConnectors = function(p) {
-    var offset = this.size + 10.0;
-    
-    if (this.hits(p)) {
-        return false;
-    }
-
-    return p.inRect(Vec.sub(this.pos, offset), Vec.add(this.pos, offset));
+    var offset = 10.0;
+    return p.inCircle(this.pos, this.size + offset);
 };
 
 function BranchView() {
@@ -78,9 +74,8 @@ var INPUT_INHIBIT = 1;
 function Cell() {
     this.inputs = [];
     this.inputTypes = [];
-    this.output = null;
+    this.outputs = [];
     this.threshold = 1;
-
     this.view = new CellView();
 }
 
@@ -155,7 +150,10 @@ function visitFibers(fiber, f) {
 }
 
 function sendSignals(net, state) {
-    var i;
+    var i, j;
+    var firing;
+    var cell;
+    var fiber;
     var signals = [];
 
     var fiberVisitor = function(fiber) {
@@ -164,10 +162,13 @@ function sendSignals(net, state) {
 
     // send signals from cells to fibers
     for (i = 0; i < net.cells.length; ++i) {
-        var firing = state[i];
+        firing = state[i];
         if (firing) {
-            var cell = net.cells[i];
-            visitFibers(cell.output, fiberVisitor);
+            cell = net.cells[i];
+            for (j = 0; j < cell.outputs.length; ++j) {
+                fiber = cell.outputs[j];
+                visitFibers(fiber, fiberVisitor);
+            }
         }
     }
 
@@ -215,6 +216,100 @@ function applySignals(net, state, signals) {
     return newState;
 }
 
+
+
+function MoveTool(e, hit) {
+    this.dragInitial = new Vec(0, 0);
+    this.dragStart;
+    this.selection = [];
+
+    var mousePos = getMousePos(gCanvas, e);
+
+    this.dragInitial = mousePos;
+    this.dragStart = hit.view.pos;
+    this.selection = [hit];
+}
+
+MoveTool.prototype.mouseMove = function(e) {
+    var i;
+    var object;
+    var mousePos = getMousePos(gCanvas, e);
+    var delta = Vec.sub(mousePos, this.dragInitial);
+
+    if (this.selection.length > 0) {
+        for (i = 0; i < this.selection.length; ++i) {
+            object = this.selection[i];
+            object.view.pos = Vec.add(this.dragStart, delta);
+        }
+    }
+};
+
+MoveTool.prototype.mouseUp = function(e) {
+
+};
+
+function CreateTool(e) {
+    var menu = document.getElementById('new-menu');
+
+    this.menu = menu;
+    this.menu.style.left = e.pageX + 'px';
+    this.menu.style.top = e.pageY + 'px';
+    this.menu.classList.add('active');
+
+    this.menu.onclick = function(e) {
+        var action;
+        var added;
+        var canvasLoc;
+        if (e.target.matches('li')) {
+            action = e.target.getAttribute('data-action');
+
+            canvasLoc = getMousePos(gCanvas, e);
+
+            if (action === 'new-cell') {
+                added = gNet.addCell();
+                added.view.pos = canvasLoc;
+            } else if (action === 'new-branch') {
+                added = gNet.addBranch();
+                added.view.pos = canvasLoc;
+            }
+
+            menu.classList.remove('active');
+        }
+    };
+}
+
+CreateTool.prototype.mouseUp = function(e) {
+    this.menu.classList.remove('active');
+};
+
+
+function FiberTool(e, cell) {
+    this.from = cell;
+    this.pos = getMousePos(gCanvas, e);
+}
+
+FiberTool.prototype.mouseMove = function(e) {
+    this.pos = getMousePos(gCanvas, e);
+};
+
+FiberTool.prototype.mouseUp = function(e) {
+    var mousePos = getMousePos(gCanvas, e);
+
+    this.to = gNet.cells.find(function (cell) {
+        return cell.view.hitsConnectors(mousePos);
+    });
+
+    if (this.to) {
+        var f = gNet.addFiber(this.from, this.to);
+
+        this.from.outputs.push(f)
+        this.to.inputs.push(f);
+    }
+};
+
+
+
+
 // WINDOW AND CONTEXT
 // -------------------------
 
@@ -223,10 +318,6 @@ var STATE_DRAG = 1;
 
 function Controller() {
     this.state = STATE_SELECT;
-    this.dragInitial = new Vec(0, 0);
-    this.dragStart;
-
-    this.selection = [];
 
     this.time = 0;
     this.play = true;
@@ -263,7 +354,6 @@ Controller.prototype.togglePlay = function() {
 var gController = new Controller();
 
 var gCanvas = document.getElementById('main-canvas');
-var gContextMenu = document.getElementById('new-menu');
 
 var gCtx = gCanvas.getContext('2d', { alpha: false });
 
@@ -283,8 +373,6 @@ function keyDownHandler(e) {
         
         e.preventDefault();
     }
-
-
 }
 
 function getMousePos(canvas, e) {
@@ -300,38 +388,33 @@ function mouseDownHandler(e) {
     });
     
     if (hit) {
-        gController.dragInitial = mousePos;
-        gController.dragStart = hit.view.pos;
-        gController.selection = [hit];
-    }
+        gController.tool = new MoveTool(e, hit);
+    } else {
 
-    var connectHit = gNet.cells.find(function (cell) {
-        return cell.view.hitsConnectors(mousePos);
-    });
+        var connectHit = gNet.cells.find(function (cell) {
+            return cell.view.hitsConnectors(mousePos);
+        });
 
-    if (connectHit) {
-        console.log('oh yeah');
+        if (connectHit) {
+            gController.tool = new FiberTool(e, connectHit);
+        }
     }
 }
 
 function mouseMoveHandler(e) {
-    var i;
-    var object;
-    var mousePos = getMousePos(gCanvas, e);
-    var delta = Vec.sub(mousePos, gController.dragInitial);
-
-    if (gController.selection.length > 0) {
-        for (i = 0; i < gController.selection.length; ++i) {
-            object = gController.selection[i];
-            object.view.pos = Vec.add(gController.dragStart, delta);
-        }
+    if (gController.tool &&
+        gController.tool.mouseMove) {
+        gController.tool.mouseMove(e);
     }
-    simDraw();
 }
 
 function mouseUpHandler(e) {
-    gController.selection = [];
-    gContextMenu.classList.remove('active');
+    if (gController.tool &&
+        gController.tool.mouseUp) {
+        gController.tool.mouseUp(e);
+    }
+
+    delete gController.tool;
 }
 
 gCanvas.onmousedown = mouseDownHandler;
@@ -342,33 +425,17 @@ window.addEventListener('keydown', keyDownHandler);
 
 gCanvas.oncontextmenu = function(e) {
     e.preventDefault();
-    gContextMenu.style.left = e.pageX + 'px';
-    gContextMenu.style.top = e.pageY + 'px';
-    gContextMenu.classList.add('active');
-};
 
-gContextMenu.onclick = function(e) {
-    var action;
-    var added;
-    var canvasLoc;
-    if (e.target.matches('li')) {
-        action = e.target.getAttribute('data-action');
+    var mousePos = getMousePos(gCanvas, e);
 
-        canvasLoc = getMousePos(gCanvas, e);
+    var hit = gNet.cells.find(function (cell) {
+        return cell.view.hits(mousePos);
+    }); 
 
-        if (action === 'new-cell') {
-            added = gNet.addCell();
-            added.view.pos = canvasLoc;
-        } else if (action === 'new-branch') {
-            added = gNet.addBranch();
-            added.view.pos = canvasLoc;
-        }
-
-        gContextMenu.classList.remove('active');
+    if (!hit) {
+        gController.tool = new CreateTool(e);
     }
 };
-
-
 
 var gNet = new Net();
 
@@ -390,18 +457,22 @@ var f2 = gNet.addFiber(c2, c3);
 var f3 = gNet.addFiber(c3, c1);
 
 
-c1.output = f1
+c1.outputs.push(f1)
 c2.inputs.push(f1);
 
-c2.output = f2;
+c2.outputs.push(f2);
 c3.inputs.push(f2);
 
-c3.output = f3;
+c3.outputs.push(f3);
 c1.inputs.push(f3);
 c1.inputTypes.push(INPUT_INHIBIT);
 
 var gState = [];
 var gSignals = [];
+
+setInterval(function() {
+    simDraw();
+}, 16);
 
 
 setInterval(function() {
@@ -416,8 +487,6 @@ function step() {
 
     gState = newState;
     gSignals = nextSignals;
-    simDraw();
-
 
     ++gController.time;
     gController.timeDisplay.innerText = String(gController.time);
@@ -428,9 +497,16 @@ function step() {
 //
 function simDraw() {
     clearCanvas(gCtx, gCanvas);
+
     drawCells(gCtx, gNet, gState);
     drawBranches(gCtx, gNet);
     drawFibers(gCtx, gNet, gSignals);
+
+    if (gController.tool) {
+        if (gController.tool instanceof FiberTool) {
+            drawPartialFiber(gCtx, gController.tool);
+        }
+    }
 }
 
 
@@ -472,7 +548,6 @@ function drawCells(ctx, net, state) {
 
     for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
-
         ctx.fillText(String(cell.threshold), cell.view.pos.x - cell.view.size * 0.5, cell.view.pos.y);
     }
 }
@@ -540,7 +615,7 @@ function stackedOffset(spread, j, n) {
 }
 
 function fiberPoints(fiber, j, n) {
-    var spread = 5.0;  
+    var spread = 7.0;  
     var yOffset = stackedOffset(spread, j, n);
 
     var s = new Vec(fiber.from.view.pos.x + fiber.from.view.size, fiber.from.view.pos.y);
@@ -549,12 +624,34 @@ function fiberPoints(fiber, j, n) {
     return [s, e];
 }
 
+// for the fiber connecting tool
+function drawPartialFiber(ctx, tool) {
+    var p1 = new Vec(tool.from.view.pos.x + tool.from.view.size, tool.from.view.pos.y);
+    var p2 = tool.pos;
+
+    var fudge = Vec.dist(p1, p2) * 0.4;
+
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([2, 2]);
+
+    ctx.beginPath(); 
+    ctx.moveTo(p1.x, p1.y);
+    ctx.bezierCurveTo(p1.x + fudge, p1.y,
+                      p2.x - fudge, p2.y,
+                      p2.x, p2.y);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+}
+
 function drawFiberPaths(ctx, net, signals, active) {
     var i, j, n;
     var cell;
     var fiber;
     var points;
     var fiberActive;
+    var fudge;
 
     ctx.beginPath(); 
     for (i = 0; i < net.cells.length; ++i)  { 
@@ -568,13 +665,23 @@ function drawFiberPaths(ctx, net, signals, active) {
             if (fiberActive === active) {
                 points = fiberPoints(fiber, j, n);
 
-                var fudge = Vec.dist(points[0], points[1]) * 0.4;
+                if (fiber.from === fiber.to) {
+                    // cell connected to itself
+                    fudge = cell.view.size * 2.0;
+                    ctx.moveTo(points[0].x, points[0].y);
+                    ctx.bezierCurveTo(points[0].x + fudge, points[0].y + fudge,
+                                      points[1].x - fudge, points[1].y + fudge,
+                                      points[1].x, points[1].y);
 
-                ctx.moveTo(points[0].x, points[0].y);
-                ctx.bezierCurveTo(points[0].x + fudge, points[0].y,
-                                   points[1].x - fudge, points[1].y,
-                                   points[1].x, points[1].y);
-            }
+                } else {
+                    // normal fiber
+                    fudge = Vec.dist(points[0], points[1]) * 0.4;
+                    ctx.moveTo(points[0].x, points[0].y);
+                    ctx.bezierCurveTo(points[0].x + fudge, points[0].y,
+                                       points[1].x - fudge, points[1].y,
+                                       points[1].x, points[1].y);
+                }
+           }
         }
     }
     ctx.stroke();
@@ -606,5 +713,4 @@ function drawConnectorPaths(ctx, net, signals, active) {
         }
     }
 }
-
 

@@ -87,14 +87,23 @@ Rotate a cell
 
 Adjust cell threshold
 
+## Tools
 
 
+Select Mode
+- click on nodes to move around
+- type number to change threshold
 
+Cell Mode
+- click to make nodes
+- right click to delete nodes
 
+Branch Mode
+- click to make branches
+- right click to delete branches
 
-
-
-
-
+Wiring Mode
+- click and drag to make wires
+- right click to delete wires
 
 
