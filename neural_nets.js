@@ -49,14 +49,14 @@ function CellView() {
 }
 
 CellView.prototype.size = 15.0;
+CellView.prototype.connectorPadding = 10.0;
 
 CellView.prototype.hits = function(p) {
     return p.inCircle(this.pos, this.size);
 }
 
 CellView.prototype.hitsConnectors = function(p) {
-    var offset = 10.0;
-    return p.inCircle(this.pos, this.size + offset);
+    return p.inCircle(this.pos, this.size + this.connectorPadding);
 };
 
 function BranchView() {
@@ -119,11 +119,25 @@ Net.prototype.addCell = function() {
     return cell;
 }
 
+Net.prototype.removeCell = function(cell) {
+    var i = this.cells.indexOf(cell);
+    if (i >= 0) {
+        delete this.cells[i];
+    }
+}
+
 Net.prototype.addFiber = function(from, to) {
     var n = insertionIndex(this.fibers);
     var fiber = new Fiber(n, from, to);
     this.fibers[n] = fiber;
     return fiber;
+}
+
+Net.prototype.removeFiber = function(f) {
+    var i = this.fibers.indexOf(f);
+    if (i >= 0) {
+        delete this.fibers[i];
+    }
 }
 
 Net.prototype.addBranch = function() {
@@ -282,24 +296,66 @@ CreateTool.prototype.mouseUp = function(e) {
     this.menu.classList.remove('active');
 };
 
+function EditTool(e, obj) {
+    var menu = document.getElementById('edit-menu');
 
-function FiberTool(e, cell) {
-    this.from = cell;
-    this.pos = getMousePos(gCanvas, e);
+    this.obj = obj;
+
+    this.menu = menu;
+    this.menu.style.left = e.pageX + 'px';
+    this.menu.style.top = e.pageY + 'px';
+    this.menu.classList.add('active');
+
+    this.menu.onclick = function(e) {
+        var action;
+        if (e.target.matches('li')) {
+            action = e.target.getAttribute('data-action');
+
+            if (action === 'delete') {
+
+                debugger;
+                obj.inputs.forEach(function (f) {
+                    gNet.removeFiber(f);
+                });
+
+                obj.outputs.forEach(function(f) {
+                    gNet.removeFiber(f);
+                });
+
+                gNet.removeCell(obj);
+            }
+        }
+    };
 }
 
-FiberTool.prototype.mouseMove = function(e) {
-    this.pos = getMousePos(gCanvas, e);
+EditTool.prototype.mouseUp = function(e) {
+    this.menu.classList.remove('active');
 };
+
+function FiberTool(e, cell) {
+    var mousePos = getMousePos(gCanvas, e);
+
+    if (mousePos.x < cell.view.pos.x) {
+        this.to = cell;
+    } else {
+        this.from = cell;
+    }
+}
 
 FiberTool.prototype.mouseUp = function(e) {
     var mousePos = getMousePos(gCanvas, e);
 
-    this.to = gNet.cells.find(function (cell) {
+    var hit = gNet.cells.find(function (cell) {
         return cell.view.hitsConnectors(mousePos);
     });
 
-    if (this.to) {
+    if (this.from) {
+        this.to = hit;
+    } else {
+        this.from = hit;
+    }
+
+    if (this.to && this.from) {
         var f = gNet.addFiber(this.from, this.to);
 
         this.from.outputs.push(f)
@@ -402,6 +458,8 @@ function mouseDownHandler(e) {
 }
 
 function mouseMoveHandler(e) {
+    gController.mousePos = getMousePos(gCanvas, e);
+
     if (gController.tool &&
         gController.tool.mouseMove) {
         gController.tool.mouseMove(e);
@@ -432,7 +490,9 @@ gCanvas.oncontextmenu = function(e) {
         return cell.view.hits(mousePos);
     }); 
 
-    if (!hit) {
+    if (hit) {
+        gController.tool = new EditTool(e, hit);
+    } else {
         gController.tool = new CreateTool(e);
     }
 };
@@ -471,7 +531,7 @@ var gState = [];
 var gSignals = [];
 
 setInterval(function() {
-    simDraw();
+    drawSim(gCtx, gCanvas, gController.mousePos);
 }, 16);
 
 
@@ -495,18 +555,20 @@ function step() {
 // RENDERER
 // --------------------------
 //
-function simDraw() {
-    clearCanvas(gCtx, gCanvas);
+function drawSim(ctx, canvas, mousePos) {
+    clearCanvas(ctx, canvas);
 
-    drawCells(gCtx, gNet, gState);
-    drawBranches(gCtx, gNet);
-    drawFibers(gCtx, gNet, gSignals);
+    drawCells(ctx, gNet, gState);
+    drawBranches(ctx, gNet);
+    drawFibers(ctx, gNet, gSignals);
 
     if (gController.tool) {
         if (gController.tool instanceof FiberTool) {
-            drawPartialFiber(gCtx, gController.tool);
+            drawPartialFiber(ctx, gController.tool, mousePos);
         }
     }
+ 
+    drawHoverRing(ctx, gNet, mousePos);
 }
 
 
@@ -516,6 +578,29 @@ function clearCanvas(ctx, canvas) {
     ctx.rect(0, 0, canvas.width, canvas.height);
     ctx.closePath();
     return ctx.fill();
+}
+
+function drawHoverRing(ctx, net, mousePos) {
+    var i;
+    var cell;
+    var radius;
+    for (i = 0; i < net.cells.length; ++i) {
+        cell = net.cells[i];
+        if (cell.view.hitsConnectors(mousePos)) {
+
+            radius = cell.view.size + cell.view.connectorPadding;
+            ctx.strokeStyle = '#003300';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4]);
+
+            ctx.beginPath(); 
+            ctx.arc(cell.view.pos.x, cell.view.pos.y, radius, 0.0, Math.PI * 2.0, false);
+
+            ctx.stroke();
+            ctx.lineWidth = 1;
+            ctx.setLineDash([]);
+        }
+    } 
 }
 
 function drawCells(ctx, net, state) {
@@ -565,7 +650,6 @@ function drawCellPaths(ctx, net, state, front, active) {
         if (cellFiring === active) {
             ctx.beginPath();
             ctx.arc(cell.view.pos.x, cell.view.pos.y, cell.view.size, Math.PI * 0.5, Math.PI * 1.5, front);
-
             ctx.fill();
             ctx.stroke();
         }
@@ -625,21 +709,27 @@ function fiberPoints(fiber, j, n) {
 }
 
 // for the fiber connecting tool
-function drawPartialFiber(ctx, tool) {
-    var p1 = new Vec(tool.from.view.pos.x + tool.from.view.size, tool.from.view.pos.y);
-    var p2 = tool.pos;
+function drawPartialFiber(ctx, tool, mousePos) {
+    var p = [];
+    if (tool.from) {
+        p[0] = new Vec(tool.from.view.pos.x + tool.from.view.size, tool.from.view.pos.y);
+        p[1] = mousePos;  
+    } else {
+        p[0] = mousePos;
+        p[1] = new Vec(tool.to.view.pos.x - tool.to.view.size, tool.to.view.pos.y);
+    }
 
-    var fudge = Vec.dist(p1, p2) * 0.4;
+    var fudge = Vec.dist(p[0], p[1]) * 0.4;
 
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
-    ctx.setLineDash([2, 2]);
+    ctx.setLineDash([2]);
 
     ctx.beginPath(); 
-    ctx.moveTo(p1.x, p1.y);
-    ctx.bezierCurveTo(p1.x + fudge, p1.y,
-                      p2.x - fudge, p2.y,
-                      p2.x, p2.y);
+    ctx.moveTo(p[0].x, p[0].y);
+    ctx.bezierCurveTo(p[0].x + fudge, p[0].y,
+                      p[1].x - fudge, p[1].y,
+                      p[1].x, p[1].y);
     ctx.stroke();
     ctx.lineWidth = 1;
     ctx.setLineDash([]);
