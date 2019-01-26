@@ -1,82 +1,15 @@
-// VIEW
-// ------------------------
-
-function Vec(x, y) {
-    this.x = x;
-    this.y = y;
-}
-
-Vec.prototype.lenSqr = function() {
-    return this.x * this.x + this.y * this.y;
-}
-
-Vec.prototype.len = function() {
-    return Math.sqrt(this.lenSqr());
-}
-
-Vec.prototype.inRect = function(min, max) {
-    return this.x >= min.x && this.y >= min.y &&
-           this.x <= max.x && this.y <= max.y;  
-};
-
-Vec.prototype.inCircle = function(o, r) {
-    return Vec.distSqr(this, o) < r * r;
-}
-
-Vec.prototype.add = function(b) {
-    this.x += b.x;
-    this.y += b.y;
-}
-
-Vec.add = function(a, b) {
-    return new Vec(a.x + b.x, a.y + b.y);
-}
-
-Vec.sub = function(a, b) {
-    return new Vec(a.x - b.x, a.y - b.y);
-}
-
-Vec.distSqr = function(a, b) {
-    return Vec.sub(a, b).lenSqr();
-}
-
-Vec.dist = function(a, b) {
-    return Math.sqrt(Vec.distSqr(a, b));
-}
-
-function CellView() {
-    this.pos = new Vec(0, 0);
-}
-
-CellView.prototype.size = 15.0;
-CellView.prototype.connectorPadding = 10.0;
-
-CellView.prototype.hits = function(p) {
-    return p.inCircle(this.pos, this.size);
-}
-
-CellView.prototype.hitsConnectors = function(p) {
-    return p.inCircle(this.pos, this.size + this.connectorPadding);
-};
-
-function BranchView() {
-    this.pos = new Vec(0, 0);
-    this.size = 5.0;
-}
-
-
 // SIMULATION
 // ------------------------
 
 var INPUT_EXCITE = 0;
 var INPUT_INHIBIT = 1;
 
-function Cell() {
+function Cell(i) {
+    this.index = i;
     this.inputs = [];
     this.inputTypes = [];
     this.outputs = [];
     this.threshold = 1;
-    this.view = new CellView();
 }
 
 function Fiber(i, from, to) {
@@ -85,26 +18,10 @@ function Fiber(i, from, to) {
     this.to = to;
 }
 
-function Branch() {
+function Branch(i) {
+    this.index = i;
     this.input = null;
     this.outputs = [];
-
-    this.view = new BranchView();
-}
-
-// find an open slot in an array
-function insertionIndex(list) {
-    var i;
-    var n = list.length;
-
-    // find an open slot
-    for (i = 0; i < list.length; ++i) {
-        if (!list[i]) {
-            n = i;
-            break;
-        }
-    }
-    return n;
 }
 
 function Net() {
@@ -112,40 +29,6 @@ function Net() {
     this.fibers = [];
     this.branches = [];
 }
-
-Net.prototype.addCell = function() {
-    var cell = new Cell();
-    this.cells.push(cell);
-    return cell;
-}
-
-Net.prototype.removeCell = function(cell) {
-    var i = this.cells.indexOf(cell);
-    if (i >= 0) {
-        delete this.cells[i];
-    }
-}
-
-Net.prototype.addFiber = function(from, to) {
-    var n = insertionIndex(this.fibers);
-    var fiber = new Fiber(n, from, to);
-    this.fibers[n] = fiber;
-    return fiber;
-}
-
-Net.prototype.removeFiber = function(f) {
-    var i = this.fibers.indexOf(f);
-    if (i >= 0) {
-        delete this.fibers[i];
-    }
-}
-
-Net.prototype.addBranch = function() {
-    var branch = new Branch();
-    this.branches.push(branch);
-    return branch;
-}
-
 
 function visitFibers(fiber, f) {
     var b;
@@ -230,7 +113,148 @@ function applySignals(net, state, signals) {
     return newState;
 }
 
+// VIEW
+// ------------------------
 
+function Vec(x, y) {
+    this.x = x;
+    this.y = y;
+}
+
+Vec.prototype.lenSqr = function() {
+    return this.x * this.x + this.y * this.y;
+}
+
+Vec.prototype.len = function() {
+    return Math.sqrt(this.lenSqr());
+}
+
+Vec.prototype.inRect = function(min, max) {
+    return this.x >= min.x && this.y >= min.y &&
+           this.x <= max.x && this.y <= max.y;  
+};
+
+Vec.prototype.inCircle = function(o, r) {
+    return Vec.distSqr(this, o) < r * r;
+}
+
+Vec.prototype.add = function(b) {
+    this.x += b.x;
+    this.y += b.y;
+}
+
+Vec.add = function(a, b) {
+    return new Vec(a.x + b.x, a.y + b.y);
+}
+
+Vec.sub = function(a, b) {
+    return new Vec(a.x - b.x, a.y - b.y);
+}
+
+Vec.distSqr = function(a, b) {
+    return Vec.sub(a, b).lenSqr();
+}
+
+Vec.dist = function(a, b) {
+    return Math.sqrt(Vec.distSqr(a, b));
+}
+
+function CellView(i) {
+    Cell.call(this, i);
+    this.pos = new Vec(0, 0);
+}
+
+CellView.prototype = Object.create(Cell.prototype);
+CellView.prototype.constructor = CellView;
+
+CellView.prototype.size = 15.0;
+CellView.prototype.connectorPadding = 10.0;
+
+CellView.prototype.hits = function(p) {
+    return p.inCircle(this.pos, this.size);
+}
+
+CellView.prototype.hitsConnectors = function(p) {
+    return p.inCircle(this.pos, this.size + this.connectorPadding);
+};
+
+
+function BranchView() {
+    Branch.call(this);
+    this.pos = new Vec(0, 0);
+}
+
+BranchView.prototype = Object.create(Branch.prototype);
+BranchView.prototype.constructor = BranchView;
+
+BranchView.prototype.size = 5.0;
+
+function NetView() {
+    Net.call(this);
+}
+
+NetView.prototype = Object.create(Net.prototype);
+NetView.prototype.constructor = NetView;
+
+NetView.prototype.addCell = function() {
+    var cell = new CellView(this.cells.length);
+    this.cells.push(cell);
+    return cell;
+}
+
+NetView.prototype.removeCell = function(toDelete) {
+    // detach all fibers
+    toDelete.inputs.forEach(this.removeFiber.bind(this));
+    toDelete.outputs.forEach(this.removeFiber.bind(this));
+
+    // algorithm Ryan thought up
+    // 1. when you delete an item
+    //    there is one unused index. 
+    //    (at the slot you deleted.)
+    // 2. set the last cells index
+    //    to the available one.
+    // 3. Shrink the array length by one
+    var last = this.cells.pop();
+    if (last !== toDelete) {
+        this.cells[toDelete.index] = last;
+        last.index = toDelete.index;
+    }
+    // now toDelete is no good
+}
+
+NetView.prototype.addFiber = function(from, to) {
+    var fiber = new Fiber(this.fibers.length, from, to);
+    this.fibers.push(fiber);
+    return fiber;
+}
+
+NetView.prototype.removeFiber = function(toDelete) {
+    var i;
+    // remove from "from" outputs
+    i = toDelete.from.outputs.indexOf(toDelete);
+    toDelete.from.outputs.splice(i, 1);
+    
+    // remove from "to" inputs
+    i = toDelete.to.inputs.indexOf(toDelete);
+    toDelete.to.inputs.splice(i, 1);
+
+    // see removeCell
+    var last = this.fibers.pop();
+    if (last !== toDelete) {
+        this.fibers[toDelete.index] = last;
+        last.index = toDelete.index;
+    }
+}
+
+NetView.prototype.addBranch = function() {
+    var branch = new BranchView();
+    this.branches.push(branch);
+    return branch;
+}
+
+
+// TOOLS
+// =====================
 
 function MoveTool(e, hit) {
     this.dragInitial = new Vec(0, 0);
@@ -240,7 +264,7 @@ function MoveTool(e, hit) {
     var mousePos = getMousePos(gCanvas, e);
 
     this.dragInitial = mousePos;
-    this.dragStart = hit.view.pos;
+    this.dragStart = hit.pos;
     this.selection = [hit];
 }
 
@@ -253,7 +277,7 @@ MoveTool.prototype.mouseMove = function(e) {
     if (this.selection.length > 0) {
         for (i = 0; i < this.selection.length; ++i) {
             object = this.selection[i];
-            object.view.pos = Vec.add(this.dragStart, delta);
+            object.pos = Vec.add(this.dragStart, delta);
         }
     }
 };
@@ -281,10 +305,10 @@ function CreateTool(e) {
 
             if (action === 'new-cell') {
                 added = gNet.addCell();
-                added.view.pos = canvasLoc;
+                added.pos = canvasLoc;
             } else if (action === 'new-branch') {
                 added = gNet.addBranch();
-                added.view.pos = canvasLoc;
+                added.pos = canvasLoc;
             }
 
             menu.classList.remove('active');
@@ -312,16 +336,7 @@ function EditTool(e, obj) {
             action = e.target.getAttribute('data-action');
 
             if (action === 'delete') {
-
-                debugger;
-                obj.inputs.forEach(function (f) {
-                    gNet.removeFiber(f);
-                });
-
-                obj.outputs.forEach(function(f) {
-                    gNet.removeFiber(f);
-                });
-
+                console.log(obj);
                 gNet.removeCell(obj);
             }
         }
@@ -335,7 +350,7 @@ EditTool.prototype.mouseUp = function(e) {
 function FiberTool(e, cell) {
     var mousePos = getMousePos(gCanvas, e);
 
-    if (mousePos.x < cell.view.pos.x) {
+    if (mousePos.x < cell.pos.x) {
         this.to = cell;
     } else {
         this.from = cell;
@@ -346,7 +361,7 @@ FiberTool.prototype.mouseUp = function(e) {
     var mousePos = getMousePos(gCanvas, e);
 
     var hit = gNet.cells.find(function (cell) {
-        return cell.view.hitsConnectors(mousePos);
+        return cell.hitsConnectors(mousePos);
     });
 
     if (this.from) {
@@ -440,7 +455,7 @@ function mouseDownHandler(e) {
     var mousePos = getMousePos(gCanvas, e);
 
     var hit = gNet.cells.find(function (cell) {
-        return cell.view.hits(mousePos);
+        return cell.hits(mousePos);
     });
     
     if (hit) {
@@ -448,7 +463,7 @@ function mouseDownHandler(e) {
     } else {
 
         var connectHit = gNet.cells.find(function (cell) {
-            return cell.view.hitsConnectors(mousePos);
+            return cell.hitsConnectors(mousePos);
         });
 
         if (connectHit) {
@@ -487,7 +502,7 @@ gCanvas.oncontextmenu = function(e) {
     var mousePos = getMousePos(gCanvas, e);
 
     var hit = gNet.cells.find(function (cell) {
-        return cell.view.hits(mousePos);
+        return cell.hits(mousePos);
     }); 
 
     if (hit) {
@@ -497,20 +512,20 @@ gCanvas.oncontextmenu = function(e) {
     }
 };
 
-var gNet = new Net();
+var gNet = new NetView();
 
 var c1 = gNet.addCell();
-c1.view.pos.x = 40;
-c1.view.pos.y = 50;
+c1.pos.x = 40;
+c1.pos.y = 50;
 c1.threshold = 0;
 
 var c2 = gNet.addCell();
-c2.view.pos.x = 90;
-c2.view.pos.y = 50;
+c2.pos.x = 90;
+c2.pos.y = 50;
 
 var c3 = gNet.addCell();
-c3.view.pos.x = 150;
-c3.view.pos.y = 50;
+c3.pos.x = 150;
+c3.pos.y = 50;
 
 var f1 = gNet.addFiber(c1, c2);
 var f2 = gNet.addFiber(c2, c3);
@@ -586,15 +601,15 @@ function drawHoverRing(ctx, net, mousePos) {
     var radius;
     for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
-        if (cell.view.hitsConnectors(mousePos)) {
+        if (cell.hitsConnectors(mousePos)) {
 
-            radius = cell.view.size + cell.view.connectorPadding;
+            radius = cell.size + cell.connectorPadding;
             ctx.strokeStyle = '#003300';
             ctx.lineWidth = 1;
             ctx.setLineDash([4]);
 
             ctx.beginPath(); 
-            ctx.arc(cell.view.pos.x, cell.view.pos.y, radius, 0.0, Math.PI * 2.0, false);
+            ctx.arc(cell.pos.x, cell.pos.y, radius, 0.0, Math.PI * 2.0, false);
 
             ctx.stroke();
             ctx.lineWidth = 1;
@@ -633,7 +648,7 @@ function drawCells(ctx, net, state) {
 
     for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
-        ctx.fillText(String(cell.threshold), cell.view.pos.x - cell.view.size * 0.5, cell.view.pos.y);
+        ctx.fillText(String(cell.threshold), cell.pos.x - cell.size * 0.5, cell.pos.y);
     }
 }
 
@@ -649,7 +664,7 @@ function drawCellPaths(ctx, net, state, front, active) {
 
         if (cellFiring === active) {
             ctx.beginPath();
-            ctx.arc(cell.view.pos.x, cell.view.pos.y, cell.view.size, Math.PI * 0.5, Math.PI * 1.5, front);
+            ctx.arc(cell.pos.x, cell.pos.y, cell.size, Math.PI * 0.5, Math.PI * 1.5, front);
             ctx.fill();
             ctx.stroke();
         }
@@ -666,7 +681,7 @@ function drawBranches(ctx, net) {
         b = net.branches[i];
         
         ctx.beginPath(); 
-        ctx.arc(b.view.pos.x, b.view.pos.y, 5.0, 0.0, Math.PI * 2.0, false);
+        ctx.arc(b.pos.x, b.pos.y, 5.0, 0.0, Math.PI * 2.0, false);
         ctx.fill();
         ctx.stroke();
     }
@@ -702,8 +717,8 @@ function fiberPoints(fiber, j, n) {
     var spread = 7.0;  
     var yOffset = stackedOffset(spread, j, n);
 
-    var s = new Vec(fiber.from.view.pos.x + fiber.from.view.size, fiber.from.view.pos.y);
-    var e = new Vec(fiber.to.view.pos.x - fiber.to.view.size, fiber.to.view.pos.y + yOffset);
+    var s = new Vec(fiber.from.pos.x + fiber.from.size, fiber.from.pos.y);
+    var e = new Vec(fiber.to.pos.x - fiber.to.size, fiber.to.pos.y + yOffset);
 
     return [s, e];
 }
@@ -712,11 +727,11 @@ function fiberPoints(fiber, j, n) {
 function drawPartialFiber(ctx, tool, mousePos) {
     var p = [];
     if (tool.from) {
-        p[0] = new Vec(tool.from.view.pos.x + tool.from.view.size, tool.from.view.pos.y);
+        p[0] = new Vec(tool.from.pos.x + tool.from.size, tool.from.pos.y);
         p[1] = mousePos;  
     } else {
         p[0] = mousePos;
-        p[1] = new Vec(tool.to.view.pos.x - tool.to.view.size, tool.to.view.pos.y);
+        p[1] = new Vec(tool.to.pos.x - tool.to.size, tool.to.pos.y);
     }
 
     var fudge = Vec.dist(p[0], p[1]) * 0.4;
@@ -757,7 +772,7 @@ function drawFiberPaths(ctx, net, signals, active) {
 
                 if (fiber.from === fiber.to) {
                     // cell connected to itself
-                    fudge = cell.view.size * 2.0;
+                    fudge = cell.size * 2.0;
                     ctx.moveTo(points[0].x, points[0].y);
                     ctx.bezierCurveTo(points[0].x + fudge, points[0].y + fudge,
                                       points[1].x - fudge, points[1].y + fudge,
