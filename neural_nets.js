@@ -188,6 +188,7 @@ BranchView.prototype = Object.create(Branch.prototype);
 BranchView.prototype.constructor = BranchView;
 
 BranchView.prototype.size = 5.0;
+
 function NetView() {
     Net.call(this);
 }
