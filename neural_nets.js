@@ -159,8 +159,8 @@ Vec.dist = function(a, b) {
     return Math.sqrt(Vec.distSqr(a, b));
 }
 
-function CellView() {
-    Cell.call(this);
+function CellView(i) {
+    Cell.call(this, i);
     this.pos = new Vec(0, 0);
 }
 
@@ -214,8 +214,10 @@ NetView.prototype.removeCell = function(toDelete) {
     //    to the available one.
     // 3. Shrink the array length by one
     var last = this.cells.pop();
-    this.cells[toDelete.index] = last;
-    last.index = toDelete.index;
+    if (last !== toDelete) {
+        this.cells[toDelete.index] = last;
+        last.index = toDelete.index;
+    }
     // now toDelete is no good
 }
 
@@ -237,8 +239,10 @@ NetView.prototype.removeFiber = function(toDelete) {
 
     // see removeCell
     var last = this.fibers.pop();
-    this.fibers[toDelete.index] = last;
-    last.index = toDelete.index;
+    if (last !== toDelete) {
+        this.fibers[toDelete.index] = last;
+        last.index = toDelete.index;
+    }
 }
 
 NetView.prototype.addBranch = function() {
