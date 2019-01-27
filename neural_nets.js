@@ -121,6 +121,7 @@ function Vec(x, y) {
     this.y = y;
 }
 
+
 Vec.prototype.lenSqr = function() {
     return this.x * this.x + this.y * this.y;
 }
@@ -129,9 +130,9 @@ Vec.prototype.len = function() {
     return Math.sqrt(this.lenSqr());
 }
 
-Vec.prototype.inRect = function(min, max) {
-    return this.x >= min.x && this.y >= min.y &&
-           this.x <= max.x && this.y <= max.y;  
+Vec.prototype.inRect = function(p, size) {
+    return this.x >= p.x && this.y >= p.y &&
+           this.x <= p.x + size.x && this.y <= p.y + size.y;  
 };
 
 Vec.prototype.inCircle = function(o, r) {
@@ -157,6 +158,12 @@ Vec.distSqr = function(a, b) {
 
 Vec.dist = function(a, b) {
     return Math.sqrt(Vec.distSqr(a, b));
+}
+
+Vec.bounds = function(a, b) {
+    const o = new Vec(Math.min(a.x, b.x), Math.min(a.y, b.y));
+    const s = new Vec(Math.max(a.x, b.x) - o.x, Math.max(a.y, b.y) - o.y);
+    return [ o, s ];
 }
 
 function CellView(i) {
@@ -191,10 +198,37 @@ BranchView.prototype.size = 5.0;
 
 function NetView() {
     Net.call(this);
+
+    // since the NetView
+    // is the visual component
+    // we will store the state here
+    // even though the underlying 
+    // structure is immutable over time
+    this.state = [];
+    this.signals = [];
+
+    this.time = 0; 
 }
 
 NetView.prototype = Object.create(Net.prototype);
 NetView.prototype.constructor = NetView;
+
+NetView.prototype.step = function() {
+    var newState = applySignals(this, this.state, this.signals);
+    var nextSignals = sendSignals(this, newState, this.signals);
+
+    this.state = newState;
+    this.signals = nextSignals;
+
+    ++this.time; 
+}
+
+NetView.prototype.restart = function() {
+    this.state = [];
+    this.signals = [];
+    this.time = 0;
+};
+
 
 NetView.prototype.addCell = function() {
     var cell = new CellView(this.cells.length);
@@ -375,37 +409,45 @@ NetView.prototype.load = function(base64) {
 // TOOLS
 // =====================
 
-function MoveTool(e, hit) {
-    this.dragInitial = new Vec(0, 0);
-    this.dragStart;
-    this.selection = [];
+function SelectTool(sim, e) {
+    this.dragInitial = sim.mousePos;
+    this.sim = sim;
+}
 
-    var mousePos = getMousePos(gCanvas, e);
+SelectTool.prototype.mouseUp = function(e) {
+    var rect = Vec.bounds(this.dragInitial, this.sim.mousePos);
 
-    this.dragInitial = mousePos;
-    this.dragStart = hit.pos;
-    this.selection = [hit];
+    var sel = this.sim.net.cells.filter(function(cell) {
+        return cell.pos.inRect(rect[0], rect[1]);
+    });
+
+    this.sim.selection = sel;
+};
+
+function MoveTool(sim, e) {
+    this.sim = sim;
+    this.initialPos = this.sim.mousePos;
+    this.previousPos = this.sim.mousePos;
 }
 
 MoveTool.prototype.mouseMove = function(e) {
     var i;
     var object;
-    var mousePos = getMousePos(gCanvas, e);
-    var delta = Vec.sub(mousePos, this.dragInitial);
+    var delta = Vec.sub(this.sim.mousePos, this.previousPos);
 
-    if (this.selection.length > 0) {
-        for (i = 0; i < this.selection.length; ++i) {
-            object = this.selection[i];
-            object.pos = Vec.add(this.dragStart, delta);
-        }
+    for (i = 0; i < this.sim.selection.length; ++i) {
+        object = this.sim.selection[i];
+        object.pos.add(delta);
     }
+
+    this.previousPos = this.sim.mousePos;
 };
 
 MoveTool.prototype.mouseUp = function(e) {
 
 };
 
-function CreateTool(e) {
+function CreateTool(sim, e) {
     var menu = document.getElementById('new-menu');
 
     this.menu = menu;
@@ -416,17 +458,15 @@ function CreateTool(e) {
     this.menu.onclick = function(e) {
         var action;
         var added;
-        var canvasLoc;
+        var canvasLoc = sim.mousePos;
         if (e.target.matches('li')) {
             action = e.target.getAttribute('data-action');
 
-            canvasLoc = getMousePos(gCanvas, e);
-
             if (action === 'new-cell') {
-                added = gNet.addCell();
+                added = sim.net.addCell();
                 added.pos = canvasLoc;
             } else if (action === 'new-branch') {
-                added = gNet.addBranch();
+                added = sim.net.addBranch();
                 added.pos = canvasLoc;
             }
 
@@ -439,7 +479,7 @@ CreateTool.prototype.mouseUp = function(e) {
     this.menu.classList.remove('active');
 };
 
-function EditTool(e, obj) {
+function EditTool(sim, e, obj) {
     var menu = document.getElementById('edit-menu');
 
     this.obj = obj;
@@ -456,7 +496,7 @@ function EditTool(e, obj) {
 
             if (action === 'delete') {
                 console.log(obj);
-                gNet.removeCell(obj);
+                sim.removeCell(obj);
             }
         }
     };
@@ -466,10 +506,9 @@ EditTool.prototype.mouseUp = function(e) {
     this.menu.classList.remove('active');
 };
 
-function FiberTool(e, cell) {
-    var mousePos = getMousePos(gCanvas, e);
-
-    if (mousePos.x < cell.pos.x) {
+function FiberTool(sim, e, cell) {
+    this.sim = sim;
+    if (this.sim.mousePos.x < cell.pos.x) {
         this.to = cell;
     } else {
         this.from = cell;
@@ -477,9 +516,9 @@ function FiberTool(e, cell) {
 }
 
 FiberTool.prototype.mouseUp = function(e) {
-    var mousePos = getMousePos(gCanvas, e);
+    var mousePos = this.sim.mousePos;
 
-    var hit = gNet.cells.find(function (cell) {
+    var hit = this.sim.net.cells.find(function (cell) {
         return cell.hitsConnectors(mousePos);
     });
 
@@ -490,38 +529,37 @@ FiberTool.prototype.mouseUp = function(e) {
     }
 
     if (this.to && this.from) {
-        var f = gNet.addFiber(this.from, this.to);
+        var f = this.sim.net.addFiber(this.from, this.to);
 
         this.from.outputs.push(f)
         this.to.inputs.push(f);
     }
 };
 
-
-
-
 // WINDOW AND CONTEXT
 // -------------------------
+//
 
-var STATE_SELECT = 0;
-var STATE_DRAG = 1;
+function getMousePos(canvas, e) {
+    var rect = canvas.getBoundingClientRect();
+    return new Vec(e.clientX - rect.left, e.clientY - rect.top);
+}
 
-function Controller() {
-    this.state = STATE_SELECT;
 
-    this.time = 0;
+function Sim() {
+    this.selection = [];
     this.play = true;
+
     this.playBtn = document.getElementById('play-btn');
     this.playBtn.onclick = this.togglePlay.bind(this);
 
     this.stepBtn = document.getElementById('step-btn');
-    this.stepBtn.onclick = step;
+    this.stepBtn.onclick = this.step.bind(this);
 
-    this.resetBtn = document.getElementById('reset-btn');
-    this.resetBtn.onclick = this.reset.bind(this);
+    this.restartBtn = document.getElementById('restart-btn');
+    this.restartBtn.onclick = this.restart.bind(this);
     
     this.timeDisplay = document.getElementById('time'); 
-
     this.storageInput = document.getElementById('storage-input');
 
     this.loadBtn = document.getElementById('load-btn');
@@ -529,9 +567,93 @@ function Controller() {
 
     this.saveBtn = document.getElementById('save-btn');
     this.saveBtn.onclick = this.save.bind(this);
+
+    this.canvas = document.getElementById('main-canvas');
+    this.ctx = this.canvas.getContext('2d', { alpha: false });
+
+
+    this.canvas.onmousedown = this.mouseDown.bind(this);
+    this.canvas.onmouseup = this.mouseUp.bind(this);
+    this.canvas.onmousemove = this.mouseMove.bind(this);
+
+    window.addEventListener('keydown', (function(e) {
+        var num;
+        if (e.key === 's') {
+            // step hotkey
+            this.step();
+            e.preventDefault();
+        } else if (e.key === ' ') {
+            // play/pause hotkey  
+            this.togglePlay();
+            e.preventDefault();
+        } else if (e.key.localeCompare('0') >= 0 && e.key.localeCompare('9') <= 0) {
+            // numbers for threshold
+            num = parseInt(e.key);
+
+            this.selection.forEach(function(c) {
+                c.threshold = num;
+            });
+            
+            e.preventDefault();
+        } else if (event.key === 'Delete' ||
+                   event.key === 'Backspace') {
+            // delete selected cells 
+            this.deleteSelection();  
+        } 
+    }).bind(this));
+    
+    this.canvas.oncontextmenu = (function(e) {
+        e.preventDefault();
+
+        var mousePos = getMousePos(this.canvas, e);
+
+        var hit = this.net.cells.find(function (cell) {
+            return cell.hits(mousePos);
+        }); 
+
+        if (hit) {
+            this.tool = new EditTool(this, e, hit);
+        } else {
+            this.tool = new CreateTool(this, e);
+        }
+    }).bind(this);
+
+    // default net
+    var net = new NetView();
+
+    var c1 = net.addCell();
+    c1.pos.x = 40;
+    c1.pos.y = 50;
+    c1.threshold = 0;
+
+    var c2 = net.addCell();
+    c2.pos.x = 90;
+    c2.pos.y = 50;
+
+    var c3 = net.addCell();
+    c3.pos.x = 150;
+    c3.pos.y = 50;
+
+    var f1 = net.addFiber(c1, c2);
+    var f2 = net.addFiber(c2, c3);
+    var f3 = net.addFiber(c3, c1);
+
+
+    c1.outputs.push(f1)
+    c2.inputs.push(f1);
+
+    c2.outputs.push(f2);
+    c3.inputs.push(f2);
+
+    c3.outputs.push(f3);
+    c1.inputs.push(f3);
+    c1.inputTypes.push(INPUT_INHIBIT);
+
+    this.net = net;
 }
 
-Controller.prototype.togglePlay = function() {
+
+Sim.prototype.togglePlay = function() {
     this.play = !this.play;
 
     if (this.play) {
@@ -541,192 +663,124 @@ Controller.prototype.togglePlay = function() {
     }
 };
 
-Controller.prototype.reset = function() {
-    gState = [];
-    this.time = 0;
-    this.timeDisplay.innerText = '0';
-}
+Sim.prototype.restart = function() {
+    this.net.restart();
+    this.timeDisplay.innerText = String(this.net.time);
+};
 
-Controller.prototype.load = function() {
-    if (gNet.load(this.storageInput.value)) {
-        this.reset();
+Sim.prototype.load = function() {
+    if (this.net.load(this.storageInput.value)) {
+        this.restart();
     } else {
         alert('The data provided was malformed.');
     }
-}
+};
 
-Controller.prototype.save = function() {
-    this.storageInput.value = gNet.save();
+Sim.prototype.save = function() {
+    this.storageInput.value = this.net.save();
     this.storageInput.select();
-}
+};
 
-var gController = new Controller();
+Sim.prototype.deleteSelection = function() {
+    var net = this.net;
+    this.selection.forEach(function(c) {
+        net.removeCell(c);
+    });
 
-var gCanvas = document.getElementById('main-canvas');
+    // clear selection
+    this.selection = [];
+};
 
-var gCtx = gCanvas.getContext('2d', { alpha: false });
+Sim.prototype.step = function() {
+    this.net.step();
+    this.timeDisplay.innerText = String(this.net.time);
+};
 
-function keyDownHandler(e) {
-    var num;
-    if (e.key === 's') {
-        // step hotkey
-        step();
-        e.preventDefault();
-    } else if (e.key === ' ') {
-        // play/pause hotkey  
-        gController.togglePlay();
-        e.preventDefault();
-    } else if (e.key.localeCompare('0') >= 0 && e.key.localeCompare('9') <= 0) {
-        // numbers for threshold
-        num = parseInt(e.key);
-        
-        e.preventDefault();
-    }
-}
+Sim.prototype.mouseDown = function(e) {
+    var mousePos = getMousePos(this.canvas, e);
+    this.mousePos = mousePos;
 
-function getMousePos(canvas, e) {
-    var rect = canvas.getBoundingClientRect();
-    return new Vec(e.clientX - rect.left, e.clientY - rect.top);
-}
-
-function mouseDownHandler(e) {
-    var mousePos = getMousePos(gCanvas, e);
-
-    var hit = gNet.cells.find(function (cell) {
+    var hit = this.net.cells.find(function (cell) {
         return cell.hits(mousePos);
     });
-    
+
+    var connectHit = this.net.cells.find(function (cell) {
+        return cell.hitsConnectors(mousePos);
+    });
+
     if (hit) {
-        gController.tool = new MoveTool(e, hit);
-    } else {
+        var index = this.selection.indexOf(hit);
 
-        var connectHit = gNet.cells.find(function (cell) {
-            return cell.hitsConnectors(mousePos);
-        });
-
-        if (connectHit) {
-            gController.tool = new FiberTool(e, connectHit);
+        if (index === -1) {
+            this.selection = [hit];
         }
-    }
-}
 
-function mouseMoveHandler(e) {
-    gController.mousePos = getMousePos(gCanvas, e);
-
-    if (gController.tool &&
-        gController.tool.mouseMove) {
-        gController.tool.mouseMove(e);
-    }
-}
-
-function mouseUpHandler(e) {
-    if (gController.tool &&
-        gController.tool.mouseUp) {
-        gController.tool.mouseUp(e);
-    }
-
-    delete gController.tool;
-}
-
-gCanvas.onmousedown = mouseDownHandler;
-gCanvas.onmousemove = mouseMoveHandler;
-gCanvas.onmouseup = mouseUpHandler;
-
-window.addEventListener('keydown', keyDownHandler);
-
-gCanvas.oncontextmenu = function(e) {
-    e.preventDefault();
-
-    var mousePos = getMousePos(gCanvas, e);
-
-    var hit = gNet.cells.find(function (cell) {
-        return cell.hits(mousePos);
-    }); 
-
-    if (hit) {
-        gController.tool = new EditTool(e, hit);
+        this.tool = new MoveTool(this, e);
+    } else if (connectHit) {
+        this.tool = new FiberTool(this, e, connectHit);
     } else {
-        gController.tool = new CreateTool(e);
+        this.tool = new SelectTool(this, e);
     }
 };
 
-var gNet = new NetView();
+Sim.prototype.mouseMove = function(e) {
+    this.mousePos = getMousePos(this.canvas, e);
 
-var c1 = gNet.addCell();
-c1.pos.x = 40;
-c1.pos.y = 50;
-c1.threshold = 0;
+    if (this.tool &&
+        this.tool.mouseMove) {
+        this.tool.mouseMove(e);
+    }
+};
 
-var c2 = gNet.addCell();
-c2.pos.x = 90;
-c2.pos.y = 50;
+Sim.prototype.mouseUp = function(e) {
+    this.mousePos = getMousePos(this.canvas, e);
 
-var c3 = gNet.addCell();
-c3.pos.x = 150;
-c3.pos.y = 50;
+    if (this.tool &&
+        this.tool.mouseUp) {
+        this.tool.mouseUp(e);
+    }
 
-var f1 = gNet.addFiber(c1, c2);
-var f2 = gNet.addFiber(c2, c3);
-var f3 = gNet.addFiber(c3, c1);
+    delete this.tool;
+};
 
-
-c1.outputs.push(f1)
-c2.inputs.push(f1);
-
-c2.outputs.push(f2);
-c3.inputs.push(f2);
-
-c3.outputs.push(f3);
-c1.inputs.push(f3);
-c1.inputTypes.push(INPUT_INHIBIT);
-
-var gState = [];
-var gSignals = [];
+var gSim = new Sim();
 
 setInterval(function() {
-    drawSim(gCtx, gCanvas, gController.mousePos);
+    drawSim(gSim.ctx, gSim.canvas, gSim);
 }, 16);
 
 
 setInterval(function() {
-    if (gController.play) {
-        step();
+    if (gSim.play) {
+        gSim.step();
     }
 }, 500);
 
-function step() {
-    var newState = applySignals(gNet, gState, gSignals);
-    var nextSignals = sendSignals(gNet, newState, gSignals);
-
-    gState = newState;
-    gSignals = nextSignals;
-
-    ++gController.time;
-    gController.timeDisplay.innerText = String(gController.time);
-}
 
 // RENDERER
 // --------------------------
 //
-function drawSim(ctx, canvas, mousePos) {
+function drawSim(ctx, canvas, sim) {
     clearCanvas(ctx, canvas);
 
-    drawCells(ctx, gNet, gState);
-    drawBranches(ctx, gNet);
-    drawFibers(ctx, gNet, gSignals);
+    drawCells(ctx, sim.net);
+    drawBranches(ctx, sim.net);
+    drawFibers(ctx, sim.net);
 
-    if (gController.tool) {
-        if (gController.tool instanceof FiberTool) {
-            drawPartialFiber(ctx, gController.tool, mousePos);
-        }
+    if (sim.tool) {
+        if (sim.tool instanceof FiberTool) {
+            drawPartialFiber(ctx, sim.tool, sim.mousePos);
+        } else if (gSim.tool instanceof SelectTool) {
+            drawSelectBox(ctx, sim.tool, sim.mousePos);
+        }        
     }
  
-    drawHoverRing(ctx, gNet, mousePos);
+    drawHoverRing(ctx, sim.net, sim.mousePos)
 }
 
 
 function clearCanvas(ctx, canvas) {
-    ctx.fillStyle = '#D0E7F9';
+    ctx.fillStyle = '#EFF0F1';
     ctx.beginPath();
     ctx.rect(0, 0, canvas.width, canvas.height);
     ctx.closePath();
@@ -756,7 +810,24 @@ function drawHoverRing(ctx, net, mousePos) {
     } 
 }
 
-function drawCells(ctx, net, state) {
+function drawSelectBox(ctx, selectTool, mousePos) {
+    ctx.strokeStyle = '#000055';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4]);
+
+    var p = [];
+    p[0] = selectTool.dragInitial;
+    p[1] = mousePos;
+
+    ctx.beginPath();
+    ctx.rect(p[0].x, p[0].y, p[1].x - p[0].x, p[1].y - p[0].y);
+    ctx.stroke();
+    
+    ctx.setLineDash([]);
+}
+
+
+function drawCells(ctx, net) {
     var i;
     var cell;
 
@@ -765,18 +836,20 @@ function drawCells(ctx, net, state) {
     ctx.fillStyle = '#FFFFFF';
 
     // firing and quiet
-    drawCellPaths(ctx, net, state, false, false);
-    drawCellPaths(ctx, net, state, false, true);
-
+    drawCellPaths(ctx, net, false, false);
+    drawCellPaths(ctx, net, false, true);
 
     // draw the front of the cells
     // quiet
     ctx.fillStyle = '#444444';
-    drawCellPaths(ctx, net, state, true, false);
+    drawCellPaths(ctx, net, true, false);
 
     // firing
     ctx.fillStyle = '#FF0000';
-    drawCellPaths(ctx, net, state, true, true);
+    drawCellPaths(ctx, net, true, true);
+
+    // draw the selected cells
+    drawSelection(ctx, net, gSim.selection);
    
     // draw the text 
     ctx.fillStyle = '#000000';
@@ -790,7 +863,7 @@ function drawCells(ctx, net, state) {
     }
 }
 
-function drawCellPaths(ctx, net, state, front, active) {
+function drawCellPaths(ctx, net, front, active) {
     var i;
     var cell;
     var cellFiring;
@@ -798,7 +871,7 @@ function drawCellPaths(ctx, net, state, front, active) {
     for (i = 0; i < net.cells.length; ++i)  { 
         cell = net.cells[i];
 
-        cellFiring = state[i] ? true : false;
+        cellFiring = net.state[i] ? true : false;
 
         if (cellFiring === active) {
             ctx.beginPath();
@@ -807,6 +880,23 @@ function drawCellPaths(ctx, net, state, front, active) {
             ctx.stroke();
         }
    }
+}
+
+function drawSelection(ctx, net, sel) {
+    ctx.strokeStyle = '#00AA00';
+    ctx.lineWidth = 2;
+ 
+    var i;
+    var cell;
+
+    for (i = 0; i < sel.length; ++i) {
+        cell = sel[i];
+        ctx.beginPath();
+        ctx.arc(cell.pos.x, cell.pos.y, cell.size, Math.PI * 2.0, 0.0, false);
+        ctx.stroke();
+    }
+
+    ctx.lineWidth = 1;
 }
 
 function drawBranches(ctx, net) {
@@ -825,26 +915,26 @@ function drawBranches(ctx, net) {
     }
 }
 
-function drawFibers(ctx, net, signals) {
+function drawFibers(ctx, net) {
     // draw quiet fibers
     ctx.strokeStyle = '#000000';
-    drawFiberPaths(ctx, net, signals, false);
+    drawFiberPaths(ctx, net, false);
 
     // draw quiet connectors
     ctx.fillStyle = '#FFFFFF';
     ctx.strokeStyle = '#000000';
-    drawConnectorPaths(ctx, net, signals, false);
+    drawConnectorPaths(ctx, net, false);
 
     // draw active fibers
     ctx.lineWidth = 2;
     ctx.strokeStyle = '#FF0000';
-    drawFiberPaths(ctx, net, signals, true);
+    drawFiberPaths(ctx, net, true);
 
     ctx.lineWidth = 1;
     // draw active connectors
     ctx.strokeStyle = '#000000';
     ctx.fillStyle = '#FF0000';
-    drawConnectorPaths(ctx, net, signals, true);
+    drawConnectorPaths(ctx, net, true);
 }
 
 function stackedOffset(spread, j, n) {
@@ -888,7 +978,7 @@ function drawPartialFiber(ctx, tool, mousePos) {
     ctx.setLineDash([]);
 }
 
-function drawFiberPaths(ctx, net, signals, active) {
+function drawFiberPaths(ctx, net, active) {
     var i, j, n;
     var cell;
     var fiber;
@@ -904,7 +994,7 @@ function drawFiberPaths(ctx, net, signals, active) {
         for (j = 0; j < n; ++j) {
             fiber = cell.inputs[j];
 
-            fiberActive = signals[fiber.index] ? true : false;
+            fiberActive = net.signals[fiber.index] ? true : false;
             if (fiberActive === active) {
                 points = fiberPoints(fiber, j, n);
 
@@ -930,7 +1020,7 @@ function drawFiberPaths(ctx, net, signals, active) {
     ctx.stroke();
 }
 
-function drawConnectorPaths(ctx, net, signals, active) {
+function drawConnectorPaths(ctx, net, active) {
     var i, j, n;
     var cell;
     var fiber;
@@ -943,7 +1033,7 @@ function drawConnectorPaths(ctx, net, signals, active) {
         n = cell.inputs.length;
         for (j = 0; j < n; ++j) {
             fiber = cell.inputs[j];
-            fiberActive = signals[fiber.index] ? true : false;
+            fiberActive = net.signals[fiber.index] ? true : false;
 
             if (cell.inputTypes[j] === INPUT_INHIBIT && fiberActive === active) {
                 points = fiberPoints(fiber, j, n);
