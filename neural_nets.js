@@ -125,11 +125,11 @@ function Vec(x, y) {
 
 Vec.prototype.lenSqr = function() {
     return this.x * this.x + this.y * this.y;
-}
+};
 
 Vec.prototype.len = function() {
     return Math.sqrt(this.lenSqr());
-}
+};
 
 Vec.prototype.inRect = function(p, size) {
     return this.x >= p.x && this.y >= p.y &&
@@ -138,34 +138,34 @@ Vec.prototype.inRect = function(p, size) {
 
 Vec.prototype.inCircle = function(o, r) {
     return Vec.distSqr(this, o) < r * r;
-}
+};
 
 Vec.prototype.add = function(b) {
     this.x += b.x;
     this.y += b.y;
-}
+};
 
 Vec.add = function(a, b) {
     return new Vec(a.x + b.x, a.y + b.y);
-}
+};
 
 Vec.sub = function(a, b) {
     return new Vec(a.x - b.x, a.y - b.y);
-}
+};
 
 Vec.distSqr = function(a, b) {
     return Vec.sub(a, b).lenSqr();
-}
+};
 
 Vec.dist = function(a, b) {
     return Math.sqrt(Vec.distSqr(a, b));
-}
+};
 
 Vec.bounds = function(a, b) {
     const o = new Vec(Math.min(a.x, b.x), Math.min(a.y, b.y));
     const s = new Vec(Math.max(a.x, b.x) - o.x, Math.max(a.y, b.y) - o.y);
     return [ o, s ];
-}
+};
 
 var ANGLE_EAST = 0;
 var ANGLE_WEST = 1;
@@ -184,7 +184,7 @@ CellView.prototype.connectorPadding = 10.0;
 
 CellView.prototype.hits = function(p) {
     return p.inCircle(this.pos, this.size);
-}
+};
 
 CellView.prototype.hitsConnectors = function(p) {
     return p.inCircle(this.pos, this.size + this.connectorPadding);
@@ -226,7 +226,7 @@ NetView.prototype.step = function() {
     this.signals = nextSignals;
 
     ++this.time;
-}
+};
 
 NetView.prototype.restart = function() {
     this.state = [];
@@ -239,7 +239,7 @@ NetView.prototype.addCell = function() {
     var cell = new CellView(this.cells.length);
     this.cells.push(cell);
     return cell;
-}
+};
 
 NetView.prototype.removeCell = function(toDelete) {
     // detach all fibers
@@ -259,7 +259,7 @@ NetView.prototype.removeCell = function(toDelete) {
         last.index = toDelete.index;
     }
     // now toDelete is no good
-}
+};
 
 NetView.prototype.addFiber = function(from, to) {
     var fiber = new Fiber(this.fibers.length);
@@ -267,7 +267,7 @@ NetView.prototype.addFiber = function(from, to) {
     fiber.to = to;
     this.fibers.push(fiber);
     return fiber;
-}
+};
 
 NetView.prototype.removeFiber = function(toDelete) {
     var i;
@@ -285,13 +285,13 @@ NetView.prototype.removeFiber = function(toDelete) {
         this.fibers[toDelete.index] = last;
         last.index = toDelete.index;
     }
-}
+};
 
 NetView.prototype.addBranch = function() {
     var branch = new BranchView();
     this.branches.push(branch);
     return branch;
-}
+};
 
 NetView.prototype.save = function() {
     var d = [];
@@ -340,7 +340,7 @@ NetView.prototype.save = function() {
     var str = String.fromCharCode.apply(null, arr8);
 
     return btoa(str);
-}
+};
 
 NetView.prototype.load = function(base64) {
     var str;
@@ -409,7 +409,7 @@ NetView.prototype.load = function(base64) {
     }
 
     return true;
-}
+};
 
 // TOOLS
 // =====================
@@ -536,7 +536,7 @@ FiberTool.prototype.mouseUp = function(e) {
     if (this.to && this.from) {
         var f = this.sim.net.addFiber(this.from, this.to);
 
-        this.from.outputs.push(f)
+        this.from.outputs.push(f);
         this.to.inputs.push(f);
     }
 };
@@ -646,7 +646,7 @@ function Sim() {
     var f3 = net.addFiber(c3, c1);
 
 
-    c1.outputs.push(f1)
+    c1.outputs.push(f1);
     c2.inputs.push(f1);
 
     c2.outputs.push(f2);
@@ -783,7 +783,7 @@ function drawSim(ctx, canvas, sim) {
         }
     }
 
-    drawHoverRing(ctx, sim.net, sim.mousePos)
+    drawHoverRing(ctx, sim.net, sim.mousePos);
 }
 
 
