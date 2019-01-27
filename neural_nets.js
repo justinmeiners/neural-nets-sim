@@ -555,6 +555,37 @@ function getMousePos(canvas, e) {
     return new Vec(e.clientX - rect.left, e.clientY - rect.top);
 }
 
+function setupDefaultNet(net) {
+    var c1 = net.addCell();
+    c1.pos.x = 40;
+    c1.pos.y = 50;
+    c1.threshold = 0;
+    c1.angle = ANGLE_WEST;
+
+    var c2 = net.addCell();
+    c2.pos.x = 90;
+    c2.pos.y = 50;
+
+    var c3 = net.addCell();
+    c3.pos.x = 150;
+    c3.pos.y = 50;
+
+    var f1 = net.addFiber(c1, c2);
+    var f2 = net.addFiber(c2, c3);
+    var f3 = net.addFiber(c3, c1);
+
+
+    c1.outputs.push(f1);
+    c2.inputs.push(f1);
+
+    c2.outputs.push(f2);
+    c3.inputs.push(f2);
+
+    c3.outputs.push(f3);
+    c1.inputs.push(f3);
+    c1.inputTypes.push(INPUT_INHIBIT);
+}
+
 
 function Sim() {
     this.selection = [];
@@ -629,39 +660,19 @@ function Sim() {
         }
     }).bind(this);
 
-    // default net
-    var net = new NetView();
+    // create a new net
+    this.net = new NetView();
 
-    var c1 = net.addCell();
-    c1.pos.x = 40;
-    c1.pos.y = 50;
-    c1.threshold = 0;
-    c1.angle = ANGLE_WEST;
+    // handle download
+    // if they provided one
+    var urlParams = new URLSearchParams(window.location.search);
+    var downloadUrl = urlParams.get('d');
 
-    var c2 = net.addCell();
-    c2.pos.x = 90;
-    c2.pos.y = 50;
-
-    var c3 = net.addCell();
-    c3.pos.x = 150;
-    c3.pos.y = 50;
-
-    var f1 = net.addFiber(c1, c2);
-    var f2 = net.addFiber(c2, c3);
-    var f3 = net.addFiber(c3, c1);
-
-
-    c1.outputs.push(f1);
-    c2.inputs.push(f1);
-
-    c2.outputs.push(f2);
-    c3.inputs.push(f2);
-
-    c3.outputs.push(f3);
-    c1.inputs.push(f3);
-    c1.inputTypes.push(INPUT_INHIBIT);
-
-    this.net = net;
+    if (downloadUrl && downloadUrl.length > 0) {
+        this.download(downloadUrl);
+    } else {
+        setupDefaultNet(this.net);
+    }
 }
 
 
@@ -679,6 +690,20 @@ Sim.prototype.restart = function() {
     this.selection = [];
     this.net.restart();
     this.timeDisplay.innerText = String(this.net.time);
+};
+
+Sim.prototype.download = function(url) {
+    var req = new XMLHttpRequest();
+    req.open('GET', url);
+    req.send();
+
+    req.onerror = function(err) {
+        alert(err.message);
+    };
+
+    req.onload = (function() {
+        this.net.load(req.responseText.trim());
+    }).bind(this);
 };
 
 Sim.prototype.load = function() {
