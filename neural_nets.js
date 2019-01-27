@@ -1,3 +1,7 @@
+// Created by Justin Meiners
+// LICENSE GPL v3.0
+// https://raw.githubusercontent.com/justinmeiners/neural-nets-sim/master/LICENSE
+
 // SIMULATION
 // ------------------------
 
