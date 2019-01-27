@@ -12,10 +12,10 @@ function Cell(i) {
     this.threshold = 1;
 }
 
-function Fiber(i, from, to) {
+function Fiber(i) {
     this.index = i;
-    this.from = from;
-    this.to = to;
+    this.from = null;
+    this.to = null;
 }
 
 function Branch(i) {
@@ -223,7 +223,9 @@ NetView.prototype.removeCell = function(toDelete) {
 }
 
 NetView.prototype.addFiber = function(from, to) {
-    var fiber = new Fiber(this.fibers.length, from, to);
+    var fiber = new Fiber(this.fibers.length);
+    fiber.from = from;
+    fiber.to = to;
     this.fibers.push(fiber);
     return fiber;
 }
@@ -252,6 +254,123 @@ NetView.prototype.addBranch = function() {
     return branch;
 }
 
+NetView.prototype.save = function() {
+    var d = [];
+
+    function write(val) {
+        d.push(val);
+    }
+
+    // add a placeholder for the data length
+    write(0);
+
+    write(this.cells.length);
+    write(this.fibers.length);
+
+    for (var i = 0; i < this.cells.length; ++i) {
+        var cell = this.cells[i];
+
+        write(cell.pos.x);
+        write(cell.pos.y);
+        write(cell.threshold);
+
+        write(cell.inputs.length);
+        for (var j = 0; j < cell.inputs.length; ++j) {
+            write(cell.inputs[j].index);
+            write(cell.inputTypes[j] == INPUT_INHIBIT ? INPUT_INHIBIT : INPUT_EXCITE);
+        }
+
+        write(cell.outputs.length);
+        for (var j = 0; j < cell.outputs.length; ++j) {
+            write(cell.outputs[j].index);
+        }
+    }
+
+    for (var i = 0; i < this.fibers.length; ++i) {
+        var fiber = this.fibers[i];
+
+        write(fiber.from.index);
+        write(fiber.to.index);
+    }
+
+    // prefix the data with the length so that load can detect malformed data
+    d[0] = d.length;
+
+    var arr16 = new Uint16Array(d);
+    var arr8 = new Uint8Array(arr16.buffer);
+    var str = String.fromCharCode.apply(null, arr8);
+
+    return btoa(str);
+}
+
+NetView.prototype.load = function(base64) {
+    var str;
+
+    try {
+        str = atob(base64);
+    }
+    catch (e) {
+        // a base64 error occurred
+        return false;
+    }
+
+    var arr8 = new Uint8Array(str.length);
+
+    for (var i = 0; i < str.length; ++i) {
+        arr8[i] = str.charCodeAt(i);
+    }
+
+    var d = new Uint16Array(arr8.buffer);
+    var cursor = -1;
+
+    function read() {
+        return d[++cursor];
+    }
+
+    if (read() != d.length) {
+        // the data was in the wrong format or has been clipped
+        return false;
+    }
+
+    this.cells = new Array(read());
+    this.fibers = new Array(read());
+
+    for (var i = 0; i < this.cells.length; ++i) {
+        this.cells[i] = new CellView(i);
+    }
+
+    for (var i = 0; i < this.fibers.length; ++i) {
+        this.fibers[i] = new Fiber(i);
+    }
+
+    for (var i = 0; i < this.cells.length; ++i) {
+        var cell = this.cells[i];
+
+        cell.pos.x = read();
+        cell.pos.y = read();
+        cell.threshold = read();
+
+        cell.inputs = new Array(read());
+        for (var j = 0; j < cell.inputs.length; ++j) {
+            cell.inputs[j] = this.fibers[read()];
+            cell.inputTypes[j] = read();
+        }
+
+        cell.outputs = new Array(read());
+        for (var j = 0; j < cell.outputs.length; ++j) {
+            cell.outputs[j] = this.fibers[read()];
+        }
+    }
+
+    for (var i = 0; i < this.fibers.length; ++i) {
+        var fiber = this.fibers[i];
+
+        fiber.from = this.cells[read()];
+        fiber.to = this.cells[read()];
+    }
+
+    return true;
+}
 
 // TOOLS
 // =====================
@@ -393,23 +512,23 @@ function Controller() {
     this.time = 0;
     this.play = true;
     this.playBtn = document.getElementById('play-btn');
-    this.playBtn.onclick = (function(e) {
-        this.togglePlay();
-    }).bind(this);
+    this.playBtn.onclick = this.togglePlay.bind(this);
 
     this.stepBtn = document.getElementById('step-btn');
-    this.stepBtn.onclick = function(e) {
-        step();
-    };
+    this.stepBtn.onclick = step;
 
     this.resetBtn = document.getElementById('reset-btn');
-    this.resetBtn.onclick = (function(e) {
-        gState = [];
-        this.time = 0; 
-        this.timeDisplay.innerText = '0';
-    }).bind(this);
-
+    this.resetBtn.onclick = this.reset.bind(this);
+    
     this.timeDisplay = document.getElementById('time'); 
+
+    this.storageInput = document.getElementById('storage-input');
+
+    this.loadBtn = document.getElementById('load-btn');
+    this.loadBtn.onclick = this.load.bind(this);
+
+    this.saveBtn = document.getElementById('save-btn');
+    this.saveBtn.onclick = this.save.bind(this);
 }
 
 Controller.prototype.togglePlay = function() {
@@ -421,6 +540,25 @@ Controller.prototype.togglePlay = function() {
         this.playBtn.innerText = 'Play';
     }
 };
+
+Controller.prototype.reset = function() {
+    gState = [];
+    this.time = 0;
+    this.timeDisplay.innerText = '0';
+}
+
+Controller.prototype.load = function() {
+    if (gNet.load(this.storageInput.value)) {
+        this.reset();
+    } else {
+        alert('The data provided was malformed.');
+    }
+}
+
+Controller.prototype.save = function() {
+    this.storageInput.value = gNet.save();
+    this.storageInput.select();
+}
 
 var gController = new Controller();
 
@@ -818,4 +956,3 @@ function drawConnectorPaths(ctx, net, signals, active) {
         }
     }
 }
-

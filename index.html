@@ -45,6 +45,15 @@
             display: block;
         }
 
+        .controls {
+            margin-bottom: 0.5rem;
+        }
+
+        #storage-controls input {
+            width: 100%;
+            margin-top: 0.25rem;
+        }
+
     </style>
     </head>
 
@@ -54,11 +63,18 @@
 
             <canvas id="main-canvas" width="640" height="480"></canvas>
 
-            <span id="time"></span>
-            <button id="play-btn">Play</button>
-            <button id="step-btn" accesskey="s">Step</button> 
-            <button id="reset-btn">Reset</button>
+            <div id="playback-controls" class="controls">
+                <span id="time"></span>
+                <button id="play-btn">Pause</button>
+                <button id="step-btn" accesskey="s">Step</button>
+                <button id="reset-btn">Reset</button>
+            </div>
 
+            <div id="storage-controls" class="controls">
+                <button id="load-btn">Load</button>
+                <button id="save-btn">Save</button>
+                <input id="storage-input" type="text"/>
+            </div>
         </div>
 
         <div id='new-menu' class="context-menu"> 
