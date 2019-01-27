@@ -295,6 +295,7 @@ NetView.prototype.addBranch = function() {
 
 NetView.prototype.save = function() {
     var d = [];
+    var i, j;
 
     function write(val) {
         d.push(val);
@@ -306,7 +307,7 @@ NetView.prototype.save = function() {
     write(this.cells.length);
     write(this.fibers.length);
 
-    for (var i = 0; i < this.cells.length; ++i) {
+    for (i = 0; i < this.cells.length; ++i) {
         var cell = this.cells[i];
 
         write(cell.pos.x);
@@ -314,18 +315,18 @@ NetView.prototype.save = function() {
         write(cell.threshold);
 
         write(cell.inputs.length);
-        for (var j = 0; j < cell.inputs.length; ++j) {
+        for (j = 0; j < cell.inputs.length; ++j) {
             write(cell.inputs[j].index);
             write(cell.inputTypes[j] == INPUT_INHIBIT ? INPUT_INHIBIT : INPUT_EXCITE);
         }
 
         write(cell.outputs.length);
-        for (var j = 0; j < cell.outputs.length; ++j) {
+        for (j = 0; j < cell.outputs.length; ++j) {
             write(cell.outputs[j].index);
         }
     }
 
-    for (var i = 0; i < this.fibers.length; ++i) {
+    for (i = 0; i < this.fibers.length; ++i) {
         var fiber = this.fibers[i];
 
         write(fiber.from.index);
@@ -344,6 +345,7 @@ NetView.prototype.save = function() {
 
 NetView.prototype.load = function(base64) {
     var str;
+    var i, j;
 
     try {
         str = atob(base64);
@@ -354,7 +356,7 @@ NetView.prototype.load = function(base64) {
 
     var arr8 = new Uint8Array(str.length);
 
-    for (var i = 0; i < str.length; ++i) {
+    for (i = 0; i < str.length; ++i) {
         arr8[i] = str.charCodeAt(i);
     }
 
@@ -373,15 +375,15 @@ NetView.prototype.load = function(base64) {
     this.cells = new Array(read());
     this.fibers = new Array(read());
 
-    for (var i = 0; i < this.cells.length; ++i) {
+    for (i = 0; i < this.cells.length; ++i) {
         this.cells[i] = new CellView(i);
     }
 
-    for (var i = 0; i < this.fibers.length; ++i) {
+    for (i = 0; i < this.fibers.length; ++i) {
         this.fibers[i] = new Fiber(i);
     }
 
-    for (var i = 0; i < this.cells.length; ++i) {
+    for (i = 0; i < this.cells.length; ++i) {
         var cell = this.cells[i];
 
         cell.pos.x = read();
@@ -389,18 +391,18 @@ NetView.prototype.load = function(base64) {
         cell.threshold = read();
 
         cell.inputs = new Array(read());
-        for (var j = 0; j < cell.inputs.length; ++j) {
+        for (j = 0; j < cell.inputs.length; ++j) {
             cell.inputs[j] = this.fibers[read()];
             cell.inputTypes[j] = read();
         }
 
         cell.outputs = new Array(read());
-        for (var j = 0; j < cell.outputs.length; ++j) {
+        for (j = 0; j < cell.outputs.length; ++j) {
             cell.outputs[j] = this.fibers[read()];
         }
     }
 
-    for (var i = 0; i < this.fibers.length; ++i) {
+    for (i = 0; i < this.fibers.length; ++i) {
         var fiber = this.fibers[i];
 
         fiber.from = this.cells[read()];
