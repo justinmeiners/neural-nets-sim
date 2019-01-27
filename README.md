@@ -1,6 +1,8 @@
+# neural-nets-sim
 
-## References
-- https://dl.acm.org/citation.cfm?id=1095587
-- http://www.cse.chalmers.se/~coquand/AUTOMATA/mcp.pdf
-- https://www.dlsi.ua.es//~mlf/nnafmc/pbook/node10.html
-- https://www.rand.org/content/dam/rand/pubs/research_memoranda/2008/RM704.pdf
+# [SEE HERE](https://justinmeiners.github.io/neural-nets-sim)
+
+
+# License
+
+This code is licensed under [GPL v3.0](LICENSE).
