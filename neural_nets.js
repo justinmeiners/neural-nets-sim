@@ -6,6 +6,7 @@ var INPUT_INHIBIT = 1;
 
 function Cell(i) {
     this.index = i;
+
     this.inputs = [];
     this.inputTypes = [];
     this.outputs = [];
@@ -166,9 +167,13 @@ Vec.bounds = function(a, b) {
     return [ o, s ];
 }
 
+var ANGLE_EAST = 0;
+var ANGLE_WEST = 1;
+
 function CellView(i) {
     Cell.call(this, i);
     this.pos = new Vec(0, 0);
+    this.angle = ANGLE_EAST;
 }
 
 CellView.prototype = Object.create(Cell.prototype);
@@ -550,6 +555,8 @@ function Sim() {
     this.selection = [];
     this.play = true;
 
+    this.mousePos = new Vec(0, 0);
+
     this.playBtn = document.getElementById('play-btn');
     this.playBtn.onclick = this.togglePlay.bind(this);
 
@@ -570,7 +577,6 @@ function Sim() {
 
     this.canvas = document.getElementById('main-canvas');
     this.ctx = this.canvas.getContext('2d', { alpha: false });
-
 
     this.canvas.onmousedown = this.mouseDown.bind(this);
     this.canvas.onmouseup = this.mouseUp.bind(this);
@@ -625,6 +631,7 @@ function Sim() {
     c1.pos.x = 40;
     c1.pos.y = 50;
     c1.threshold = 0;
+    c1.angle = ANGLE_WEST;
 
     var c2 = net.addCell();
     c2.pos.x = 90;
@@ -763,9 +770,9 @@ setInterval(function() {
 function drawSim(ctx, canvas, sim) {
     clearCanvas(ctx, canvas);
 
-    drawCells(ctx, sim.net);
     drawBranches(ctx, sim.net);
     drawFibers(ctx, sim.net);
+    drawCells(ctx, sim.net);
 
     if (sim.tool) {
         if (sim.tool instanceof FiberTool) {
@@ -828,9 +835,6 @@ function drawSelectBox(ctx, selectTool, mousePos) {
 
 
 function drawCells(ctx, net) {
-    var i;
-    var cell;
-
     // draw the back of the cells
     ctx.strokeStyle = '#000000';
     ctx.fillStyle = '#FFFFFF';
@@ -852,6 +856,14 @@ function drawCells(ctx, net) {
     drawSelection(ctx, net, gSim.selection);
    
     // draw the text 
+    drawCellLabels(ctx, net);
+}
+
+function drawCellLabels(ctx, net) {
+    var i;
+    var cell;
+    var flip;
+
     ctx.fillStyle = '#000000';
     ctx.font = '14pt monospace';
     ctx.textAlign = "center";
@@ -859,14 +871,25 @@ function drawCells(ctx, net) {
 
     for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
-        ctx.fillText(String(cell.threshold), cell.pos.x - cell.size * 0.5, cell.pos.y);
+
+        if (cell.angle === ANGLE_EAST) {
+            flip = -1.0;
+        } else {
+            flip = 1.0;
+        }
+
+        ctx.fillText(String(cell.threshold), cell.pos.x + cell.size * 0.5 * flip, cell.pos.y);
     }
 }
 
-function drawCellPaths(ctx, net, front, active) {
+// draws the path for half the cell
+// ctx options are used to configure front or back style
+function drawCellPaths(ctx, net, frontPart, active) {
     var i;
     var cell;
     var cellFiring;
+
+    var clockwise;
 
     for (i = 0; i < net.cells.length; ++i)  { 
         cell = net.cells[i];
@@ -874,8 +897,15 @@ function drawCellPaths(ctx, net, front, active) {
         cellFiring = net.state[i] ? true : false;
 
         if (cellFiring === active) {
+
+            if (cell.angle === ANGLE_EAST) {
+                clockwise = frontPart;
+            }  else {
+                clockwise = !frontPart;
+            }
+
             ctx.beginPath();
-            ctx.arc(cell.pos.x, cell.pos.y, cell.size, Math.PI * 0.5, Math.PI * 1.5, front);
+            ctx.arc(cell.pos.x, cell.pos.y, cell.size, Math.PI * 0.5, Math.PI * 1.5, clockwise);
             ctx.fill();
             ctx.stroke();
         }
@@ -915,40 +945,63 @@ function drawBranches(ctx, net) {
     }
 }
 
+function stackedOffset(spread, j, n) {
+    return spread * (j - (n - 1) * 0.5);
+}
+
+// returns a list of tuples
+// [startPoint, endPoint, type]
+function buildFiberPoints(net) {
+    var i;
+    var j;
+    var cell;
+    var f;
+    var type;
+    var N;
+    var points = [];
+
+    for (i = 0; i < net.cells.length; ++i) {
+        cell = net.cells[i];
+
+        N = cell.inputs.length;
+        for (j = 0; j < N; ++j) {
+            f = cell.inputs[j];
+            type = cell.inputTypes[j];
+
+            var spread = 7.0;  
+            var yOffset = stackedOffset(spread, j, N);
+
+            var s = new Vec(f.from.pos.x + f.from.size, f.from.pos.y);
+            var e = new Vec(f.to.pos.x - f.to.size, f.to.pos.y + yOffset);
+
+            points.push([s, e, type]);
+        }
+    }
+    return points;
+}
+
 function drawFibers(ctx, net) {
+    var fiberPoints = buildFiberPoints(net);
+
     // draw quiet fibers
     ctx.strokeStyle = '#000000';
-    drawFiberPaths(ctx, net, false);
+    drawFiberPaths(ctx, net, false, fiberPoints);
 
     // draw quiet connectors
     ctx.fillStyle = '#FFFFFF';
     ctx.strokeStyle = '#000000';
-    drawConnectorPaths(ctx, net, false);
+    drawConnectorPaths(ctx, net, false, fiberPoints);
 
     // draw active fibers
     ctx.lineWidth = 2;
     ctx.strokeStyle = '#FF0000';
-    drawFiberPaths(ctx, net, true);
+    drawFiberPaths(ctx, net, true, fiberPoints);
 
     ctx.lineWidth = 1;
     // draw active connectors
     ctx.strokeStyle = '#000000';
     ctx.fillStyle = '#FF0000';
-    drawConnectorPaths(ctx, net, true);
-}
-
-function stackedOffset(spread, j, n) {
-    return spread * (j - (n - 1) * 0.5);
-}
-
-function fiberPoints(fiber, j, n) {
-    var spread = 7.0;  
-    var yOffset = stackedOffset(spread, j, n);
-
-    var s = new Vec(fiber.from.pos.x + fiber.from.size, fiber.from.pos.y);
-    var e = new Vec(fiber.to.pos.x - fiber.to.size, fiber.to.pos.y + yOffset);
-
-    return [s, e];
+    drawConnectorPaths(ctx, net, true, fiberPoints);
 }
 
 // for the fiber connecting tool
@@ -978,71 +1031,62 @@ function drawPartialFiber(ctx, tool, mousePos) {
     ctx.setLineDash([]);
 }
 
-function drawFiberPaths(ctx, net, active) {
-    var i, j, n;
-    var cell;
+function drawFiberPaths(ctx, net, active, fiberPoints) {
+    var i;
     var fiber;
-    var points;
     var fiberActive;
     var fudge;
+    var p;
 
     ctx.beginPath(); 
-    for (i = 0; i < net.cells.length; ++i)  { 
-        cell = net.cells[i];
+    for (i = 0; i < net.fibers.length; ++i)  { 
+        fiber = net.fibers[i];
+        p = fiberPoints[i];
 
-        n = cell.inputs.length;
-        for (j = 0; j < n; ++j) {
-            fiber = cell.inputs[j];
+        fiberActive = net.signals[fiber.index] ? true : false;
 
-            fiberActive = net.signals[fiber.index] ? true : false;
-            if (fiberActive === active) {
-                points = fiberPoints(fiber, j, n);
+        if (fiberActive !== active) {
+            continue;
+        }
 
-                if (fiber.from === fiber.to) {
-                    // cell connected to itself
-                    fudge = cell.size * 2.0;
-                    ctx.moveTo(points[0].x, points[0].y);
-                    ctx.bezierCurveTo(points[0].x + fudge, points[0].y + fudge,
-                                      points[1].x - fudge, points[1].y + fudge,
-                                      points[1].x, points[1].y);
+        if (fiber.from === fiber.to) {
+            // cell connected to itself
+            fudge = cell.size * 2.0;
+            ctx.moveTo(p.x, p[0].y);
+            ctx.bezierCurveTo(p[0].x + fudge, p[0].y + fudge,
+                              p[1].x - fudge, p[1].y + fudge,
+                              p[1].x, p[1].y);
 
-                } else {
-                    // normal fiber
-                    fudge = Vec.dist(points[0], points[1]) * 0.4;
-                    ctx.moveTo(points[0].x, points[0].y);
-                    ctx.bezierCurveTo(points[0].x + fudge, points[0].y,
-                                       points[1].x - fudge, points[1].y,
-                                       points[1].x, points[1].y);
-                }
-           }
+        } else {
+            // normal fiber
+            fudge = Vec.dist(p[0], p[1]) * 0.4;
+            ctx.moveTo(p[0].x, p[0].y);
+            ctx.bezierCurveTo(p[0].x + fudge, p[0].y,
+                               p[1].x - fudge, p[1].y,
+                               p[1].x, p[1].y);
         }
     }
     ctx.stroke();
 }
 
-function drawConnectorPaths(ctx, net, active) {
-    var i, j, n;
-    var cell;
+function drawConnectorPaths(ctx, net, active, fiberPoints) {
+    var i;
     var fiber;
-    var points;
     var fiberActive;
+    var fiberType;
+    var tuple;
+ 
+    for (i = 0; i < net.fibers.length; ++i)  { 
+        fiber = net.fibers[i];
+        fiberActive = net.signals[fiber.index] ? true : false;
+        tuple = fiberPoints[i];
+        fiberType = tuple[2];
 
-    for (i = 0; i < net.cells.length; ++i)  { 
-        cell = net.cells[i];
-
-        n = cell.inputs.length;
-        for (j = 0; j < n; ++j) {
-            fiber = cell.inputs[j];
-            fiberActive = net.signals[fiber.index] ? true : false;
-
-            if (cell.inputTypes[j] === INPUT_INHIBIT && fiberActive === active) {
-                points = fiberPoints(fiber, j, n);
-
-                ctx.beginPath(); 
-                ctx.arc(points[1].x - 4.0, points[1].y, 4.0, 0.0, Math.PI * 2.0, false);
-                ctx.fill();
-                ctx.stroke();
-            }
+        if (fiberType === INPUT_INHIBIT && fiberActive === active) {
+            ctx.beginPath(); 
+            ctx.arc(tuple[1].x - 4.0, tuple[1].y, 4.0, 0.0, Math.PI * 2.0, false);
+            ctx.fill();
+            ctx.stroke();
         }
     }
 }
