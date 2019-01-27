@@ -671,6 +671,7 @@ Sim.prototype.togglePlay = function() {
 };
 
 Sim.prototype.restart = function() {
+    this.selection = [];
     this.net.restart();
     this.timeDisplay.innerText = String(this.net.time);
 };
