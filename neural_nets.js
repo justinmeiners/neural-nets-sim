@@ -512,23 +512,23 @@ function Controller() {
     this.time = 0;
     this.play = true;
     this.playBtn = document.getElementById('play-btn');
-    this.playBtn.onclick = (function(e) {
-        this.togglePlay();
-    }).bind(this);
+    this.playBtn.onclick = this.togglePlay.bind(this);
 
     this.stepBtn = document.getElementById('step-btn');
-    this.stepBtn.onclick = function(e) {
-        step();
-    };
+    this.stepBtn.onclick = step;
 
     this.resetBtn = document.getElementById('reset-btn');
-    this.resetBtn.onclick = (function(e) {
-        gState = [];
-        this.time = 0; 
-        this.timeDisplay.innerText = '0';
-    }).bind(this);
-
+    this.resetBtn.onclick = this.reset.bind(this);
+    
     this.timeDisplay = document.getElementById('time'); 
+
+    this.storageInput = document.getElementById('storage-input');
+
+    this.loadBtn = document.getElementById('load-btn');
+    this.loadBtn.onclick = this.load.bind(this);
+
+    this.saveBtn = document.getElementById('save-btn');
+    this.saveBtn.onclick = this.save.bind(this);
 }
 
 Controller.prototype.togglePlay = function() {
@@ -540,6 +540,25 @@ Controller.prototype.togglePlay = function() {
         this.playBtn.innerText = 'Play';
     }
 };
+
+Controller.prototype.reset = function() {
+    gState = [];
+    this.time = 0;
+    this.timeDisplay.innerText = '0';
+}
+
+Controller.prototype.load = function() {
+    if (gNet.load(this.storageInput.value)) {
+        this.reset();
+    } else {
+        alert('The data provided was malformed.');
+    }
+}
+
+Controller.prototype.save = function() {
+    this.storageInput.value = gNet.save();
+    this.storageInput.select();
+}
 
 var gController = new Controller();
 
@@ -937,4 +956,3 @@ function drawConnectorPaths(ctx, net, signals, active) {
         }
     }
 }
-
