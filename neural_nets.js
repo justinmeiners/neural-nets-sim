@@ -87,7 +87,7 @@ function applySignals(net, state, signals) {
         cell = net.cells[i];
 
         // count up activated
-        // and check for inhibit 
+        // and check for inhibit
         activated = 0;
         inhibited = false;
 
@@ -98,7 +98,7 @@ function applySignals(net, state, signals) {
             if (signals[inputFiber.index]) {
                 if (inputType === INPUT_INHIBIT) {
                     inhibited = true;
-                    break; 
+                    break;
                 } else {
                     ++activated;
                 }
@@ -133,7 +133,7 @@ Vec.prototype.len = function() {
 
 Vec.prototype.inRect = function(p, size) {
     return this.x >= p.x && this.y >= p.y &&
-           this.x <= p.x + size.x && this.y <= p.y + size.y;  
+           this.x <= p.x + size.x && this.y <= p.y + size.y;
 };
 
 Vec.prototype.inCircle = function(o, r) {
@@ -207,12 +207,12 @@ function NetView() {
     // since the NetView
     // is the visual component
     // we will store the state here
-    // even though the underlying 
+    // even though the underlying
     // structure is immutable over time
     this.state = [];
     this.signals = [];
 
-    this.time = 0; 
+    this.time = 0;
 }
 
 NetView.prototype = Object.create(Net.prototype);
@@ -225,7 +225,7 @@ NetView.prototype.step = function() {
     this.state = newState;
     this.signals = nextSignals;
 
-    ++this.time; 
+    ++this.time;
 }
 
 NetView.prototype.restart = function() {
@@ -248,7 +248,7 @@ NetView.prototype.removeCell = function(toDelete) {
 
     // algorithm Ryan thought up
     // 1. when you delete an item
-    //    there is one unused index. 
+    //    there is one unused index.
     //    (at the slot you deleted.)
     // 2. set the last cells index
     //    to the available one.
@@ -274,7 +274,7 @@ NetView.prototype.removeFiber = function(toDelete) {
     // remove from "from" outputs
     i = toDelete.from.outputs.indexOf(toDelete);
     toDelete.from.outputs.splice(i, 1);
-    
+
     // remove from "to" inputs
     i = toDelete.to.inputs.indexOf(toDelete);
     toDelete.to.inputs.splice(i, 1);
@@ -565,8 +565,8 @@ function Sim() {
 
     this.restartBtn = document.getElementById('restart-btn');
     this.restartBtn.onclick = this.restart.bind(this);
-    
-    this.timeDisplay = document.getElementById('time'); 
+
+    this.timeDisplay = document.getElementById('time');
     this.storageInput = document.getElementById('storage-input');
 
     this.loadBtn = document.getElementById('load-btn');
@@ -589,7 +589,7 @@ function Sim() {
             this.step();
             e.preventDefault();
         } else if (e.key === ' ') {
-            // play/pause hotkey  
+            // play/pause hotkey
             this.togglePlay();
             e.preventDefault();
         } else if (e.key.localeCompare('0') >= 0 && e.key.localeCompare('9') <= 0) {
@@ -599,15 +599,15 @@ function Sim() {
             this.selection.forEach(function(c) {
                 c.threshold = num;
             });
-            
+
             e.preventDefault();
         } else if (event.key === 'Delete' ||
                    event.key === 'Backspace') {
-            // delete selected cells 
-            this.deleteSelection();  
-        } 
+            // delete selected cells
+            this.deleteSelection();
+        }
     }).bind(this));
-    
+
     this.canvas.oncontextmenu = (function(e) {
         e.preventDefault();
 
@@ -615,7 +615,7 @@ function Sim() {
 
         var hit = this.net.cells.find(function (cell) {
             return cell.hits(mousePos);
-        }); 
+        });
 
         if (hit) {
             this.tool = new EditTool(this, e, hit);
@@ -780,9 +780,9 @@ function drawSim(ctx, canvas, sim) {
             drawPartialFiber(ctx, sim.tool, sim.mousePos);
         } else if (gSim.tool instanceof SelectTool) {
             drawSelectBox(ctx, sim.tool, sim.mousePos);
-        }        
+        }
     }
- 
+
     drawHoverRing(ctx, sim.net, sim.mousePos)
 }
 
@@ -808,14 +808,14 @@ function drawHoverRing(ctx, net, mousePos) {
             ctx.lineWidth = 1;
             ctx.setLineDash([4]);
 
-            ctx.beginPath(); 
+            ctx.beginPath();
             ctx.arc(cell.pos.x, cell.pos.y, radius, 0.0, Math.PI * 2.0, false);
 
             ctx.stroke();
             ctx.lineWidth = 1;
             ctx.setLineDash([]);
         }
-    } 
+    }
 }
 
 function drawSelectBox(ctx, selectTool, mousePos) {
@@ -830,7 +830,7 @@ function drawSelectBox(ctx, selectTool, mousePos) {
     ctx.beginPath();
     ctx.rect(p[0].x, p[0].y, p[1].x - p[0].x, p[1].y - p[0].y);
     ctx.stroke();
-    
+
     ctx.setLineDash([]);
 }
 
@@ -855,8 +855,8 @@ function drawCells(ctx, net) {
 
     // draw the selected cells
     drawSelection(ctx, net, gSim.selection);
-   
-    // draw the text 
+
+    // draw the text
     drawCellLabels(ctx, net);
 }
 
@@ -868,7 +868,7 @@ function drawCellLabels(ctx, net) {
     ctx.fillStyle = '#000000';
     ctx.font = '14pt monospace';
     ctx.textAlign = "center";
-    ctx.textBaseline = "middle"; 
+    ctx.textBaseline = "middle";
 
     for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
@@ -892,7 +892,7 @@ function drawCellPaths(ctx, net, frontPart, active) {
 
     var clockwise;
 
-    for (i = 0; i < net.cells.length; ++i)  { 
+    for (i = 0; i < net.cells.length; ++i)  {
         cell = net.cells[i];
 
         cellFiring = net.state[i] ? true : false;
@@ -916,7 +916,7 @@ function drawCellPaths(ctx, net, frontPart, active) {
 function drawSelection(ctx, net, sel) {
     ctx.strokeStyle = '#00AA00';
     ctx.lineWidth = 2;
- 
+
     var i;
     var cell;
 
@@ -938,8 +938,8 @@ function drawBranches(ctx, net) {
 
     for (i = 0; i < net.branches.length; ++i) {
         b = net.branches[i];
-        
-        ctx.beginPath(); 
+
+        ctx.beginPath();
         ctx.arc(b.pos.x, b.pos.y, 5.0, 0.0, Math.PI * 2.0, false);
         ctx.fill();
         ctx.stroke();
@@ -969,7 +969,7 @@ function buildFiberPoints(net) {
             f = cell.inputs[j];
             type = cell.inputTypes[j];
 
-            var spread = 7.0;  
+            var spread = 7.0;
             var yOffset = stackedOffset(spread, j, N);
 
             var s = new Vec(f.from.pos.x + f.from.size, f.from.pos.y);
@@ -1010,7 +1010,7 @@ function drawPartialFiber(ctx, tool, mousePos) {
     var p = [];
     if (tool.from) {
         p[0] = new Vec(tool.from.pos.x + tool.from.size, tool.from.pos.y);
-        p[1] = mousePos;  
+        p[1] = mousePos;
     } else {
         p[0] = mousePos;
         p[1] = new Vec(tool.to.pos.x - tool.to.size, tool.to.pos.y);
@@ -1022,7 +1022,7 @@ function drawPartialFiber(ctx, tool, mousePos) {
     ctx.lineWidth = 2;
     ctx.setLineDash([2]);
 
-    ctx.beginPath(); 
+    ctx.beginPath();
     ctx.moveTo(p[0].x, p[0].y);
     ctx.bezierCurveTo(p[0].x + fudge, p[0].y,
                       p[1].x - fudge, p[1].y,
@@ -1039,8 +1039,8 @@ function drawFiberPaths(ctx, net, active, fiberPoints) {
     var fudge;
     var p;
 
-    ctx.beginPath(); 
-    for (i = 0; i < net.fibers.length; ++i)  { 
+    ctx.beginPath();
+    for (i = 0; i < net.fibers.length; ++i)  {
         fiber = net.fibers[i];
         p = fiberPoints[i];
 
@@ -1076,15 +1076,15 @@ function drawConnectorPaths(ctx, net, active, fiberPoints) {
     var fiberActive;
     var fiberType;
     var tuple;
- 
-    for (i = 0; i < net.fibers.length; ++i)  { 
+
+    for (i = 0; i < net.fibers.length; ++i)  {
         fiber = net.fibers[i];
         fiberActive = net.signals[fiber.index] ? true : false;
         tuple = fiberPoints[i];
         fiberType = tuple[2];
 
         if (fiberType === INPUT_INHIBIT && fiberActive === active) {
-            ctx.beginPath(); 
+            ctx.beginPath();
             ctx.arc(tuple[1].x - 4.0, tuple[1].y, 4.0, 0.0, Math.PI * 2.0, false);
             ctx.fill();
             ctx.stroke();
