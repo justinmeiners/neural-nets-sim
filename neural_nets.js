@@ -347,8 +347,7 @@ NetView.prototype.load = function(base64) {
 
     try {
         str = atob(base64);
-    }
-    catch (e) {
+    } catch (e) {
         // a base64 error occurred
         return false;
     }
@@ -867,8 +866,8 @@ function drawCellLabels(ctx, net) {
 
     ctx.fillStyle = '#000000';
     ctx.font = '14pt monospace';
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
     for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
@@ -910,7 +909,7 @@ function drawCellPaths(ctx, net, frontPart, active) {
             ctx.fill();
             ctx.stroke();
         }
-   }
+    }
 }
 
 function drawSelection(ctx, net, sel) {
@@ -1057,14 +1056,13 @@ function drawFiberPaths(ctx, net, active, fiberPoints) {
             ctx.bezierCurveTo(p[0].x + fudge, p[0].y + fudge,
                               p[1].x - fudge, p[1].y + fudge,
                               p[1].x, p[1].y);
-
         } else {
             // normal fiber
             fudge = Vec.dist(p[0], p[1]) * 0.4;
             ctx.moveTo(p[0].x, p[0].y);
             ctx.bezierCurveTo(p[0].x + fudge, p[0].y,
-                               p[1].x - fudge, p[1].y,
-                               p[1].x, p[1].y);
+                              p[1].x - fudge, p[1].y,
+                              p[1].x, p[1].y);
         }
     }
     ctx.stroke();
@@ -1077,7 +1075,7 @@ function drawConnectorPaths(ctx, net, active, fiberPoints) {
     var fiberType;
     var tuple;
 
-    for (i = 0; i < net.fibers.length; ++i)  {
+    for (i = 0; i < net.fibers.length; ++i) {
         fiber = net.fibers[i];
         fiberActive = net.signals[fiber.index] ? true : false;
         tuple = fiberPoints[i];
