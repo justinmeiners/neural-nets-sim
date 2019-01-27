@@ -959,7 +959,7 @@ function buildFiberPoints(net) {
     var f;
     var type;
     var N;
-    var points = [];
+    var points = new Array(net.fibers.length);
 
     for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
@@ -975,7 +975,7 @@ function buildFiberPoints(net) {
             var s = new Vec(f.from.pos.x + f.from.size, f.from.pos.y);
             var e = new Vec(f.to.pos.x - f.to.size, f.to.pos.y + yOffset);
 
-            points.push([s, e, type]);
+            points[f.index] = [s, e, type];
         }
     }
     return points;
@@ -1052,7 +1052,7 @@ function drawFiberPaths(ctx, net, active, fiberPoints) {
 
         if (fiber.from === fiber.to) {
             // cell connected to itself
-            fudge = cell.size * 2.0;
+            fudge = fiber.from.size * 2.0;
             ctx.moveTo(p.x, p[0].y);
             ctx.bezierCurveTo(p[0].x + fudge, p[0].y + fudge,
                               p[1].x - fudge, p[1].y + fudge,
