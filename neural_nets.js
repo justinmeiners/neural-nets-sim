@@ -782,6 +782,10 @@ function Sim() {
     this.canvas.onmouseup = this.mouseUp.bind(this);
     this.canvas.onmousemove = this.mouseMove.bind(this);
 
+    this.canvas.onselectstart = function() {
+        return false;
+    };
+
     window.addEventListener('keydown', (function(e) {
         var num;
         if (e.key === 's') {
@@ -1020,7 +1024,7 @@ function drawHoverRing(ctx, net, mousePos) {
 }
 
 function drawSelectBox(ctx, selectTool, mousePos) {
-    ctx.strokeStyle = '#000055';
+    ctx.strokeStyle = '#009900';
     ctx.lineWidth = 1;
     ctx.setLineDash([4]);
 
@@ -1115,7 +1119,7 @@ function drawCellPaths(ctx, net, frontPart, active) {
 }
 
 function drawSelection(ctx, net, sel) {
-    ctx.strokeStyle = '#00AA00';
+    ctx.strokeStyle = '#009900';
     ctx.lineWidth = 2;
 
     var i;
