@@ -135,9 +135,9 @@ Vec.prototype.len = function() {
     return Math.sqrt(this.lenSqr());
 };
 
-Vec.prototype.inRect = function(p, size) {
-    return this.x >= p.x && this.y >= p.y &&
-           this.x <= p.x + size.x && this.y <= p.y + size.y;
+Vec.prototype.inBounds = function(min, max) {
+    return this.x >= min.x && this.y >= min.y &&
+           this.x <= max.x && this.y <= max.y;
 };
 
 Vec.prototype.inCircle = function(o, r) {
@@ -157,6 +157,10 @@ Vec.sub = function(a, b) {
     return new Vec(a.x - b.x, a.y - b.y);
 };
 
+Vec.scale = function(a, s) {
+    return new Vec(a.x * s, a.y * s);
+};
+
 Vec.distSqr = function(a, b) {
     return Vec.sub(a, b).lenSqr();
 };
@@ -165,11 +169,26 @@ Vec.dist = function(a, b) {
     return Math.sqrt(Vec.distSqr(a, b));
 };
 
-Vec.bounds = function(a, b) {
-    const o = new Vec(Math.min(a.x, b.x), Math.min(a.y, b.y));
-    const s = new Vec(Math.max(a.x, b.x) - o.x, Math.max(a.y, b.y) - o.y);
-    return [ o, s ];
+Vec.min = function(a, b) {  
+    return new Vec(Math.min(a.x, b.x), Math.min(a.y, b.y));
 };
+
+Vec.max = function(a, b) {
+    return new Vec(Math.max(a.x, b.x), Math.max(a.y, b.y));
+}
+
+Vec.dot = function(a, b) {
+    return a.x * b.x + a.y * b.y;
+}
+
+Vec.bezier = function(t, p1, cp1, cp2, p2) {
+    var inv_t = 1.0 - t;
+    var a = Vec.scale(p1, inv_t * inv_t * inv_t);
+    var b = Vec.scale(cp1, 3.0 * inv_t * inv_t * t);
+    var c = Vec.scale(cp2, 3.0 * inv_t * t * t);
+    var d = Vec.scale(p2, t * t * t);
+    return Vec.add(a, Vec.add(b, Vec.add(c, d)));
+}
 
 var ANGLE_EAST = 0;
 var ANGLE_WEST = 1;
@@ -194,6 +213,97 @@ CellView.prototype.hitsConnectors = function(p) {
     return p.inCircle(this.pos, this.size + this.connectorPadding);
 };
 
+
+function FiberView(i) {
+    Fiber.call(this, i);
+
+    // don't set this.
+    // Its driven by the inputTypes
+    // on cell
+    this.outputType = INPUT_EXCITE;
+
+    // cache of
+    // beizer curve points
+    // [p0, cp0, cp1, p1]
+    this.bezierPoints = new Array(4);
+}
+
+FiberView.prototype = Object.create(Fiber.prototype);
+
+// ATTEMPT 1: minimize distance between curve and point
+// I did the math for this one. 
+// Its relatively easy to get the derviative of
+// D(t) = || B(t) - q ||^2
+// however actually minimzing that
+// requires solving a cubic polynomial
+// and I don't want to mess around with Newton's method.
+
+// ATTEMPT 2: Use isPointInStroke
+// Maintaining the ctx state is awkward.
+// It also doesn't seem to account for lineWidth
+// correctly so its not very useable
+
+// ATTEMPT 3: Chop the bezier curve into line segements
+// and minimize the distance along each line.
+
+
+
+FiberView.prototype.hits = function(q) {
+    var p = this.bezierPoints;
+
+    // early rejection
+    // with a bounding box
+    var min = p.reduce(Vec.min);
+    var max = p.reduce(Vec.max);
+    
+    if (!q.inBounds(min, max)) {
+        return false;
+    }
+    
+    // number of segments
+    var N = 50;
+
+    // collision radius 
+    // around path
+    var r = 9.0;
+    // cache this
+    var rSqr = r * r;
+
+    var x0 = p[0];
+    var x1;
+    var t;
+
+    // l: vector in direction of line segmeent
+    // d: delta from x0 to q
+    // c: component of delta on l
+    var l;
+    var d;
+    var c;
+
+    for (var i = 1; i <= N; ++i) {
+        t = i / N;
+
+        // line segement from x0 to x1 along the path
+        x1 = Vec.bezier(t, p[0], p[1], p[2], p[3]);
+
+        l = Vec.sub(x1, x0);
+        d = Vec.sub(q, x0);
+
+        // project delta onto seg
+        // two Inv sqrt :(
+        c = Vec.scale(l, Vec.dot(l, d) / (l.len() * d.len())); 
+
+        // subtract projection
+        // check if below distance
+        if (Vec.sub(d, c).lenSqr() < rSqr) {
+            return true;
+        }
+        // save previous point
+        x0 = x1;
+    }
+
+    return false;
+};
 
 function BranchView() {
     Branch.call(this);
@@ -266,7 +376,7 @@ NetView.prototype.removeCell = function(toDelete) {
 };
 
 NetView.prototype.addFiber = function(from, to) {
-    var fiber = new Fiber(this.fibers.length);
+    var fiber = new FiberView(this.fibers.length);
     fiber.from = from;
     fiber.to = to;
     this.fibers.push(fiber);
@@ -384,7 +494,7 @@ NetView.prototype.load = function(base64) {
     }
 
     for (i = 0; i < this.fibers.length; ++i) {
-        this.fibers[i] = new Fiber(i);
+        this.fibers[i] = new FiberView(i);
     }
 
     for (i = 0; i < this.cells.length; ++i) {
@@ -425,10 +535,11 @@ function SelectTool(sim, e) {
 }
 
 SelectTool.prototype.mouseUp = function(e) {
-    var rect = Vec.bounds(this.dragInitial, this.sim.mousePos);
+    var min = Vec.min(this.dragInitial, this.sim.mousePos);
+    var max = Vec.max(this.dragInitial, this.sim.mousePos);
 
     var sel = this.sim.net.cells.filter(function(cell) {
-        return cell.pos.inRect(rect[0], rect[1]);
+        return cell.pos.inBounds(min, max);
     });
 
     this.sim.selection = sel;
@@ -656,7 +767,14 @@ function Sim() {
         if (hit) {
             this.tool = new EditTool(this, e, hit);
         } else {
-            this.tool = new CreateTool(this, e);
+            hit = this.net.fibers.find(function (fiber) {
+                return fiber.hits(mousePos);
+            });
+            if (hit) {
+                console.log('wow!!!');
+            } else {
+                this.tool = new CreateTool(this, e, hit);
+            }
         }
     }).bind(this);
 
@@ -674,7 +792,6 @@ function Sim() {
         setupDefaultNet(this.net);
     }
 }
-
 
 Sim.prototype.togglePlay = function() {
     this.play = !this.play;
@@ -982,14 +1099,15 @@ function stackedOffset(spread, j, n) {
 
 // returns a list of tuples
 // [startPoint, endPoint, type]
-function buildFiberPoints(net) {
+function updateFiberPoints(net) {
     var i;
     var j;
     var cell;
     var f;
-    var type;
     var N;
-    var points = new Array(net.fibers.length);
+    var fudge;
+    var yOffset;
+    var p;
 
     for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
@@ -997,45 +1115,58 @@ function buildFiberPoints(net) {
         N = cell.inputs.length;
         for (j = 0; j < N; ++j) {
             f = cell.inputs[j];
-            type = cell.inputTypes[j];
+j
+            // cache this for rendering
+            f.outputType = cell.inputTypes[j];
 
-            var spread = 7.0;
-            var yOffset = stackedOffset(spread, j, N);
+            yOffset = stackedOffset(7.0, j, N);
+            p = f.bezierPoints;
 
-            var s = new Vec(f.from.pos.x + f.from.size, f.from.pos.y);
-            var e = new Vec(f.to.pos.x - f.to.size, f.to.pos.y + yOffset);
+            p[0] = new Vec(f.from.pos.x + f.from.size, f.from.pos.y);
+            p[3] = new Vec(f.to.pos.x - f.to.size, f.to.pos.y + yOffset);
 
-            points[f.index] = [s, e, type];
+            // control points
+            if (f.from === f.to) {
+                // cell connected to itself
+                fudge = f.from.size * 2.0;
+                p[1] = new Vec(p[0].x + fudge, p[0].y + fudge);
+                p[2] = new Vec(p[3].x - fudge, p[3].y + fudge);
+            } else {
+                // normal fiber
+                fudge = Vec.dist(p[0], p[3]) * 0.4;
+                p[1] = new Vec(p[0].x + fudge, p[0].y);
+                p[2] = new Vec(p[3].x - fudge, p[3].y); 
+            }
         }
     }
-    return points;
 }
 
 function drawFibers(ctx, net) {
-    var fiberPoints = buildFiberPoints(net);
+    updateFiberPoints(net);
 
     // draw quiet fibers
     ctx.strokeStyle = '#000000';
-    drawFiberPaths(ctx, net, false, fiberPoints);
+    drawFiberPaths(ctx, net, false);
 
     // draw quiet connectors
     ctx.fillStyle = '#FFFFFF';
     ctx.strokeStyle = '#000000';
-    drawConnectorPaths(ctx, net, false, fiberPoints);
+    drawConnectorPaths(ctx, net, false);
 
     // draw active fibers
     ctx.lineWidth = 2;
     ctx.strokeStyle = '#FF0000';
-    drawFiberPaths(ctx, net, true, fiberPoints);
+    drawFiberPaths(ctx, net, true);
 
     ctx.lineWidth = 1;
     // draw active connectors
     ctx.strokeStyle = '#000000';
     ctx.fillStyle = '#FF0000';
-    drawConnectorPaths(ctx, net, true, fiberPoints);
+    drawConnectorPaths(ctx, net, true);
 }
 
-// for the fiber connecting tool
+// draw "in progress" fibers for
+// the fiber connecting tool
 function drawPartialFiber(ctx, tool, mousePos) {
     var p = [];
     if (tool.from) {
@@ -1062,59 +1193,45 @@ function drawPartialFiber(ctx, tool, mousePos) {
     ctx.setLineDash([]);
 }
 
-function drawFiberPaths(ctx, net, active, fiberPoints) {
+function drawFiberPaths(ctx, net, active) {
     var i;
     var fiber;
     var fiberActive;
-    var fudge;
     var p;
 
     ctx.beginPath();
     for (i = 0; i < net.fibers.length; ++i)  {
         fiber = net.fibers[i];
-        p = fiberPoints[i];
-
         fiberActive = net.signals[fiber.index] ? true : false;
 
         if (fiberActive !== active) {
             continue;
         }
 
-        if (fiber.from === fiber.to) {
-            // cell connected to itself
-            fudge = fiber.from.size * 2.0;
-            ctx.moveTo(p.x, p[0].y);
-            ctx.bezierCurveTo(p[0].x + fudge, p[0].y + fudge,
-                              p[1].x - fudge, p[1].y + fudge,
-                              p[1].x, p[1].y);
-        } else {
-            // normal fiber
-            fudge = Vec.dist(p[0], p[1]) * 0.4;
-            ctx.moveTo(p[0].x, p[0].y);
-            ctx.bezierCurveTo(p[0].x + fudge, p[0].y,
-                              p[1].x - fudge, p[1].y,
-                              p[1].x, p[1].y);
-        }
+        p = fiber.bezierPoints;
+        ctx.moveTo(p[0].x, p[0].y);
+        ctx.bezierCurveTo(p[1].x, p[1].y,
+                          p[2].x, p[2].y,
+                          p[3].x, p[3].y);
     }
     ctx.stroke();
 }
 
-function drawConnectorPaths(ctx, net, active, fiberPoints) {
+function drawConnectorPaths(ctx, net, active) {
     var i;
     var fiber;
     var fiberActive;
-    var fiberType;
     var tuple;
+    var p;
 
     for (i = 0; i < net.fibers.length; ++i) {
         fiber = net.fibers[i];
         fiberActive = net.signals[fiber.index] ? true : false;
-        tuple = fiberPoints[i];
-        fiberType = tuple[2];
+        p = fiber.bezierPoints;
 
-        if (fiberType === INPUT_INHIBIT && fiberActive === active) {
+        if (fiber.outputType === INPUT_INHIBIT && fiberActive === active) {
             ctx.beginPath();
-            ctx.arc(tuple[1].x - 4.0, tuple[1].y, 4.0, 0.0, Math.PI * 2.0, false);
+            ctx.arc(p[3].x - 4.0, p[3].y, 4.0, 0.0, Math.PI * 2.0, false);
             ctx.fill();
             ctx.stroke();
         }
