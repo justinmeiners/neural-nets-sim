@@ -220,7 +220,7 @@ function FiberView(i) {
     // don't set this.
     // Its driven by the inputTypes
     // on cell
-    this.outputType = INPUT_EXCITE;
+    this.ouputIndex = -1;
 
     // cache of
     // beizer curve points
@@ -600,7 +600,7 @@ CreateTool.prototype.mouseUp = function(e) {
     this.menu.classList.remove('active');
 };
 
-function EditTool(sim, e, obj) {
+function EditCellTool(sim, e, obj) {
     var menu = document.getElementById('edit-menu');
 
     this.obj = obj;
@@ -617,13 +617,45 @@ function EditTool(sim, e, obj) {
 
             if (action === 'delete') {
                 console.log(obj);
-                sim.removeCell(obj);
+                sim.net.removeCell(obj);
             }
         }
     };
 }
 
-EditTool.prototype.mouseUp = function(e) {
+EditCellTool.prototype.mouseUp = function(e) {
+    this.menu.classList.remove('active');
+};
+
+function EditFiberTool(sim, e, obj) {
+    var menu = document.getElementById('fiber-menu');
+
+    this.obj = obj;
+
+    this.menu = menu;
+    this.menu.style.left = e.pageX + 'px';
+    this.menu.style.top = e.pageY + 'px';
+    this.menu.classList.add('active');
+
+    this.menu.onclick = function(e) {
+        var j;
+        var action;
+        if (e.target.matches('li')) {
+            action = e.target.getAttribute('data-action');
+
+            if (action === 'delete') {
+                sim.net.removeFiber(obj);
+            } else if (action === 'inhibit') {
+                // find index in cell
+                obj.to.inputTypes[obj.outputIndex] = INPUT_INHIBIT;
+            } else if (action === 'excite') {
+                obj.to.inputTypes[obj.outputIndex] = INPUT_EXCITE;
+            }
+        }
+    };
+}
+
+EditFiberTool.prototype.mouseUp = function(e) {
     this.menu.classList.remove('active');
 };
 
@@ -765,13 +797,13 @@ function Sim() {
         });
 
         if (hit) {
-            this.tool = new EditTool(this, e, hit);
+            this.tool = new EditCellTool(this, e, hit);
         } else {
             hit = this.net.fibers.find(function (fiber) {
                 return fiber.hits(mousePos);
             });
             if (hit) {
-                console.log('wow!!!');
+                this.tool = new EditFiberTool(this, e, hit);
             } else {
                 this.tool = new CreateTool(this, e, hit);
             }
@@ -1117,7 +1149,7 @@ function updateFiberPoints(net) {
             f = cell.inputs[j];
 j
             // cache this for rendering
-            f.outputType = cell.inputTypes[j];
+            f.outputIndex = j;
 
             yOffset = stackedOffset(7.0, j, N);
             p = f.bezierPoints;
@@ -1223,13 +1255,16 @@ function drawConnectorPaths(ctx, net, active) {
     var fiberActive;
     var tuple;
     var p;
+    var outputType;
 
     for (i = 0; i < net.fibers.length; ++i) {
         fiber = net.fibers[i];
         fiberActive = net.signals[fiber.index] ? true : false;
         p = fiber.bezierPoints;
 
-        if (fiber.outputType === INPUT_INHIBIT && fiberActive === active) {
+        outputType = fiber.to.inputTypes[fiber.outputIndex];
+
+        if (outputType === INPUT_INHIBIT && fiberActive === active) {
             ctx.beginPath();
             ctx.arc(p[3].x - 4.0, p[3].y, 4.0, 0.0, Math.PI * 2.0, false);
             ctx.fill();
