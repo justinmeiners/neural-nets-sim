@@ -199,18 +199,20 @@ function CellView(i) {
     this.angle = ANGLE_EAST;
 }
 
+CellView.radius = 15.0;
+
 CellView.prototype = Object.create(Cell.prototype);
 CellView.prototype.constructor = CellView;
 
-CellView.prototype.size = 15.0;
-CellView.prototype.connectorPadding = 10.0;
+CellView.prototype.radius = CellView.radius;
+CellView.prototype.connectorPadding = 12.0;
 
 CellView.prototype.hits = function(p) {
-    return p.inCircle(this.pos, this.size);
+    return p.inCircle(this.pos, this.radius);
 };
 
 CellView.prototype.hitsConnectors = function(p) {
-    return p.inCircle(this.pos, this.size + this.connectorPadding);
+    return p.inCircle(this.pos, this.radius + this.connectorPadding);
 };
 
 
@@ -313,7 +315,7 @@ function BranchView() {
 BranchView.prototype = Object.create(Branch.prototype);
 BranchView.prototype.constructor = BranchView;
 
-BranchView.prototype.size = 5.0;
+BranchView.prototype.radius = 5.0;
 
 function NetView() {
     Net.call(this);
@@ -628,6 +630,7 @@ EditCellTool.prototype.mouseUp = function(e) {
 };
 
 function EditFiberTool(sim, e, obj) {
+    var inputType;
     var menu = document.getElementById('fiber-menu');
 
     this.obj = obj;
@@ -645,11 +648,15 @@ function EditFiberTool(sim, e, obj) {
 
             if (action === 'delete') {
                 sim.net.removeFiber(obj);
-            } else if (action === 'inhibit') {
+            } else if (action === 'toggle') {
                 // find index in cell
-                obj.to.inputTypes[obj.outputIndex] = INPUT_INHIBIT;
-            } else if (action === 'excite') {
-                obj.to.inputTypes[obj.outputIndex] = INPUT_EXCITE;
+                if (obj.to.inputTypes[obj.outputIndex] === INPUT_INHIBIT) {
+                    inputType = INPUT_EXCITE;
+                } else {
+                    inputType = INPUT_INHIBIT;
+                }
+                
+                obj.to.inputTypes[obj.outputIndex] = inputType;
             }
         }
     };
@@ -661,6 +668,8 @@ EditFiberTool.prototype.mouseUp = function(e) {
 
 function FiberTool(sim, e, cell) {
     this.sim = sim;
+    this.initial = this.sim.mousePos;
+
     if (this.sim.mousePos.x < cell.pos.x) {
         this.to = cell;
     } else {
@@ -675,18 +684,31 @@ FiberTool.prototype.mouseUp = function(e) {
         return cell.hitsConnectors(mousePos);
     });
 
+    if (!hit) {
+        // didn't click anything
+        return;
+    }
+
     if (this.from) {
         this.to = hit;
     } else {
         this.from = hit;
     }
 
-    if (this.to && this.from) {
-        var f = this.sim.net.addFiber(this.from, this.to);
+    if (this.from === this.to) {
+        // connecting to ourselves
 
-        this.from.outputs.push(f);
-        this.to.inputs.push(f);
+        // we need some distance to make sure this isn't
+        // an accidental click
+        if (Vec.sub(this.sim.mousePos, this.initial).lenSqr() < 
+            CellView.radius * CellView.radius) {
+            return;
+        }
     }
+
+    var f = this.sim.net.addFiber(this.from, this.to);
+    this.from.outputs.push(f);
+    this.to.inputs.push(f);
 };
 
 // WINDOW AND CONTEXT
@@ -716,7 +738,6 @@ function setupDefaultNet(net) {
     var f1 = net.addFiber(c1, c2);
     var f2 = net.addFiber(c2, c3);
     var f3 = net.addFiber(c3, c1);
-
 
     c1.outputs.push(f1);
     c2.inputs.push(f1);
@@ -980,10 +1001,11 @@ function drawHoverRing(ctx, net, mousePos) {
     var radius;
     for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
-        if (cell.hitsConnectors(mousePos)) {
+        if (cell.hitsConnectors(mousePos) &&
+            !cell.hits(mousePos)) {
 
-            radius = cell.size + cell.connectorPadding;
-            ctx.strokeStyle = '#003300';
+            radius = cell.radius + cell.connectorPadding;
+            ctx.strokeStyle = '#0000FF';
             ctx.lineWidth = 1;
             ctx.setLineDash([4]);
 
@@ -1058,7 +1080,7 @@ function drawCellLabels(ctx, net) {
             flip = 1.0;
         }
 
-        ctx.fillText(String(cell.threshold), cell.pos.x + cell.size * 0.5 * flip, cell.pos.y);
+        ctx.fillText(String(cell.threshold), cell.pos.x + cell.radius * 0.5 * flip, cell.pos.y);
     }
 }
 
@@ -1085,7 +1107,7 @@ function drawCellPaths(ctx, net, frontPart, active) {
             }
 
             ctx.beginPath();
-            ctx.arc(cell.pos.x, cell.pos.y, cell.size, Math.PI * 0.5, Math.PI * 1.5, clockwise);
+            ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 0.5, Math.PI * 1.5, clockwise);
             ctx.fill();
             ctx.stroke();
         }
@@ -1102,7 +1124,7 @@ function drawSelection(ctx, net, sel) {
     for (i = 0; i < sel.length; ++i) {
         cell = sel[i];
         ctx.beginPath();
-        ctx.arc(cell.pos.x, cell.pos.y, cell.size, Math.PI * 2.0, 0.0, false);
+        ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 2.0, 0.0, false);
         ctx.stroke();
     }
 
@@ -1154,13 +1176,13 @@ j
             yOffset = stackedOffset(7.0, j, N);
             p = f.bezierPoints;
 
-            p[0] = new Vec(f.from.pos.x + f.from.size, f.from.pos.y);
-            p[3] = new Vec(f.to.pos.x - f.to.size, f.to.pos.y + yOffset);
+            p[0] = new Vec(f.from.pos.x + f.from.radius, f.from.pos.y);
+            p[3] = new Vec(f.to.pos.x - f.to.radius, f.to.pos.y + yOffset);
 
             // control points
             if (f.from === f.to) {
                 // cell connected to itself
-                fudge = f.from.size * 2.0;
+                fudge = f.from.radius * 2.0;
                 p[1] = new Vec(p[0].x + fudge, p[0].y + fudge);
                 p[2] = new Vec(p[3].x - fudge, p[3].y + fudge);
             } else {
@@ -1202,11 +1224,11 @@ function drawFibers(ctx, net) {
 function drawPartialFiber(ctx, tool, mousePos) {
     var p = [];
     if (tool.from) {
-        p[0] = new Vec(tool.from.pos.x + tool.from.size, tool.from.pos.y);
+        p[0] = new Vec(tool.from.pos.x + tool.from.radius, tool.from.pos.y);
         p[1] = mousePos;
     } else {
         p[0] = mousePos;
-        p[1] = new Vec(tool.to.pos.x - tool.to.size, tool.to.pos.y);
+        p[1] = new Vec(tool.to.pos.x - tool.to.radius, tool.to.pos.y);
     }
 
     var fudge = Vec.dist(p[0], p[1]) * 0.4;
