@@ -772,7 +772,7 @@ function getMousePos(canvas, e) {
     return new Vec(e.clientX - rect.left, e.clientY - rect.top);
 }
 
-var DefaultNet = '';
+var DefaultNet = 'TwAGAAgAJwH2AAAAAAABAAUAAQADAAAAAQAGAJEBkgABAAAAAQAAAAAAAQACAJEBxgABAAAAAQABAAAAAQADAPcB7QADAAAAAwACAAAAAwAAAAcAAAABAAQAFAFFAQEAAQABAAQAAAABAAUAkwEGAQEAAAABAAYAAAABAAcAAAABAAAAAgABAAMAAgADAAMABAAEAAAAAAAFAAUAAwA=';
 
 function Sim() {
     this.selection = [];
