@@ -147,6 +147,7 @@ Vec.prototype.inCircle = function(o, r) {
 Vec.prototype.add = function(b) {
     this.x += b.x;
     this.y += b.y;
+    return this;
 };
 
 Vec.add = function(a, b) {
@@ -179,7 +180,7 @@ Vec.max = function(a, b) {
 
 Vec.dot = function(a, b) {
     return a.x * b.x + a.y * b.y;
-}
+};
 
 Vec.bezier = function(t, p1, cp1, cp2, p2) {
     var inv_t = 1.0 - t;
@@ -188,10 +189,20 @@ Vec.bezier = function(t, p1, cp1, cp2, p2) {
     var c = Vec.scale(cp2, 3.0 * inv_t * t * t);
     var d = Vec.scale(p2, t * t * t);
     return Vec.add(a, Vec.add(b, Vec.add(c, d)));
-}
+};
 
 var ANGLE_EAST = 0;
 var ANGLE_WEST = 1;
+
+Vec.fromAngle = function(angle) {
+    if (angle === ANGLE_EAST) {
+        return new Vec(1.0, 0.0);
+    } else if (angle === ANGLE_WEST) {
+        return new Vec(-1.0, 0.0);
+    } else {
+        return new Vec(0.0, 0.0);
+    }
+};
 
 function CellView(i) {
     Cell.call(this, i);
@@ -247,8 +258,6 @@ FiberView.prototype = Object.create(Fiber.prototype);
 
 // ATTEMPT 3: Chop the bezier curve into line segements
 // and minimize the distance along each line.
-
-
 
 FiberView.prototype.hits = function(q) {
     var p = this.bezierPoints;
@@ -394,6 +403,7 @@ NetView.prototype.removeFiber = function(toDelete) {
     // remove from "to" inputs
     i = toDelete.to.inputs.indexOf(toDelete);
     toDelete.to.inputs.splice(i, 1);
+    toDelete.to.inputTypes.splice(i, 1);
 
     // see removeCell
     var last = this.fibers.pop();
@@ -429,6 +439,7 @@ NetView.prototype.save = function() {
         write(cell.pos.x);
         write(cell.pos.y);
         write(cell.threshold);
+        write(cell.angle);
 
         write(cell.inputs.length);
         for (j = 0; j < cell.inputs.length; ++j) {
@@ -462,6 +473,8 @@ NetView.prototype.save = function() {
 NetView.prototype.load = function(base64) {
     var str;
     var i, j;
+    var cell;
+    var fiber;
 
     try {
         str = atob(base64);
@@ -500,11 +513,12 @@ NetView.prototype.load = function(base64) {
     }
 
     for (i = 0; i < this.cells.length; ++i) {
-        var cell = this.cells[i];
+        cell = this.cells[i];
 
         cell.pos.x = read();
         cell.pos.y = read();
         cell.threshold = read();
+        cell.angle = read();
 
         cell.inputs = new Array(read());
         for (j = 0; j < cell.inputs.length; ++j) {
@@ -519,7 +533,7 @@ NetView.prototype.load = function(base64) {
     }
 
     for (i = 0; i < this.fibers.length; ++i) {
-        var fiber = this.fibers[i];
+        fiber = this.fibers[i];
 
         fiber.from = this.cells[read()];
         fiber.to = this.cells[read()];
@@ -632,11 +646,21 @@ function EditCellTool(sim, e, obj) {
             action = e.target.getAttribute('data-action');
 
             if (action === 'delete') {
-                sim.net.removeCell(obj);
+                // delete selected cells
+                sim.deleteSelection();  
+            } else if (action === 'flip') {
+
+                sim.selection.forEach(function(fiber) {
+                    if (fiber.angle === ANGLE_EAST) {
+                        fiber.angle = ANGLE_WEST;
+                    } else {
+                        fiber.angle = ANGLE_EAST;
+                    }
+                });
             }
         }
 
-        this.menu.classList.remove('active');
+        menu.classList.remove('active');
     };
 }
 
@@ -695,10 +719,14 @@ function FiberTool(sim, e, cell) {
     this.sim = sim;
     this.initial = this.sim.mousePos;
 
-    if (this.sim.mousePos.x < cell.pos.x) {
-        this.to = cell;
-    } else {
+    var dir = Vec.sub(this.sim.mousePos, cell.pos);
+ 
+    console.log(Vec.dot(dir, Vec.fromAngle(cell.angle)));
+
+    if (Vec.dot(dir, Vec.fromAngle(cell.angle))  > 0.0) {
         this.from = cell;
+    } else {
+        this.to = cell;
     }
 }
 
@@ -734,6 +762,7 @@ FiberTool.prototype.mouseUp = function(e) {
     var f = this.sim.net.addFiber(this.from, this.to);
     this.from.outputs.push(f);
     this.to.inputs.push(f);
+    this.to.inputTypes.push(INPUT_EXCITE);
 };
 
 // WINDOW AND CONTEXT
@@ -745,36 +774,7 @@ function getMousePos(canvas, e) {
     return new Vec(e.clientX - rect.left, e.clientY - rect.top);
 }
 
-function setupDefaultNet(net) {
-    var c1 = net.addCell();
-    c1.pos.x = 40;
-    c1.pos.y = 50;
-    c1.threshold = 0;
-    c1.angle = ANGLE_WEST;
-
-    var c2 = net.addCell();
-    c2.pos.x = 90;
-    c2.pos.y = 50;
-
-    var c3 = net.addCell();
-    c3.pos.x = 150;
-    c3.pos.y = 50;
-
-    var f1 = net.addFiber(c1, c2);
-    var f2 = net.addFiber(c2, c3);
-    var f3 = net.addFiber(c3, c1);
-
-    c1.outputs.push(f1);
-    c2.inputs.push(f1);
-
-    c2.outputs.push(f2);
-    c3.inputs.push(f2);
-
-    c3.outputs.push(f3);
-    c1.inputs.push(f3);
-    c1.inputTypes.push(INPUT_INHIBIT);
-}
-
+var DefaultNet = '';
 
 function Sim() {
     this.selection = [];
@@ -881,8 +881,7 @@ function Sim() {
     if (downloadUrl && downloadUrl.length > 0) {
         this.download(downloadUrl);
     } else {
-        setupDefaultNet(this.net);
-    }
+        this.net.load(DefaultNet);}
 }
 
 Sim.prototype.togglePlay = function() {
@@ -1108,7 +1107,8 @@ function drawCells(ctx, net) {
 function drawCellLabels(ctx, net) {
     var i;
     var cell;
-    var flip;
+    var dir;
+    var labelPos;
 
     ctx.fillStyle = '#000000';
     ctx.font = '14pt monospace';
@@ -1117,14 +1117,10 @@ function drawCellLabels(ctx, net) {
 
     for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
+        dir = Vec.fromAngle(cell.angle);
 
-        if (cell.angle === ANGLE_EAST) {
-            flip = -1.0;
-        } else {
-            flip = 1.0;
-        }
-
-        ctx.fillText(String(cell.threshold), cell.pos.x + cell.radius * 0.5 * flip, cell.pos.y);
+        labelPos = Vec.sub(cell.pos, Vec.scale(dir, cell.radius * 0.5));
+        ctx.fillText(String(cell.threshold), labelPos.x, labelPos.y);
     }
 }
 
@@ -1207,33 +1203,40 @@ function updateFiberPoints(net) {
     var yOffset;
     var p;
 
-    for (i = 0; i < net.cells.length; ++i) {
-        cell = net.cells[i];
+    var fromDir;
+    var toDir;
 
+   for (i = 0; i < net.cells.length; ++i) {
+        cell = net.cells[i];
         N = cell.inputs.length;
+
         for (j = 0; j < N; ++j) {
             f = cell.inputs[j];
-j
             // cache this for rendering
             f.outputIndex = j;
+
+            // rotation vectors
+            fromDir = Vec.fromAngle(f.from.angle);
+            toDir = Vec.fromAngle(f.to.angle);
 
             yOffset = stackedOffset(7.0, j, N);
             p = f.bezierPoints;
 
-            p[0] = new Vec(f.from.pos.x + f.from.radius, f.from.pos.y);
-            p[3] = new Vec(f.to.pos.x - f.to.radius, f.to.pos.y + yOffset);
+            p[0] = Vec.add(f.from.pos, Vec.scale(fromDir, f.from.radius));
+            p[3] = Vec.add(Vec.add(f.to.pos, Vec.scale(toDir, -f.to.radius)), new Vec(0.0, yOffset));
 
             // control points
             if (f.from === f.to) {
                 // cell connected to itself
-                fudge = f.from.radius * 2.0;
-                p[1] = new Vec(p[0].x + fudge, p[0].y + fudge);
-                p[2] = new Vec(p[3].x - fudge, p[3].y + fudge);
+                fudge = f.from.radius * 1.6;
+                p[1] = Vec.add(Vec.add(f.from.pos, Vec.scale(fromDir, fudge * 1.5)), new Vec(0.0, -fudge * 2.0));
+                p[2] = Vec.add(Vec.add(f.to.pos, Vec.scale(toDir, -fudge * 3.0)), new Vec(0.0, -fudge));
             } else {
                 // normal fiber
-                fudge = Vec.dist(p[0], p[3]) * 0.4;
-                p[1] = new Vec(p[0].x + fudge, p[0].y);
-                p[2] = new Vec(p[3].x - fudge, p[3].y); 
+                fudge = Vec.dist(p[0], p[3]) * 0.5;
+
+                p[1] = Vec.add(f.from.pos, Vec.scale(fromDir, fudge));
+                p[2] = Vec.add(f.to.pos, Vec.scale(toDir, -fudge));
             }
         }
     }
@@ -1243,21 +1246,23 @@ function drawFibers(ctx, net) {
     updateFiberPoints(net);
 
     // draw quiet fibers
+    ctx.lineWidth = 1;
     ctx.strokeStyle = '#000000';
     drawFiberPaths(ctx, net, false);
-
-    // draw quiet connectors
-    ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#000000';
-    drawConnectorPaths(ctx, net, false);
 
     // draw active fibers
     ctx.lineWidth = 2;
     ctx.strokeStyle = '#FF0000';
     drawFiberPaths(ctx, net, true);
 
+    // draw quiet connectors
     ctx.lineWidth = 1;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    drawConnectorPaths(ctx, net, false);
+
     // draw active connectors
+    ctx.lineWidth = 1;
     ctx.strokeStyle = '#000000';
     ctx.fillStyle = '#FF0000';
     drawConnectorPaths(ctx, net, true);
