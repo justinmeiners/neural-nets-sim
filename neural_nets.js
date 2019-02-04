@@ -721,8 +721,6 @@ function FiberTool(sim, e, cell) {
 
     var dir = Vec.sub(this.sim.mousePos, cell.pos);
  
-    console.log(Vec.dot(dir, Vec.fromAngle(cell.angle)));
-
     if (Vec.dot(dir, Vec.fromAngle(cell.angle))  > 0.0) {
         this.from = cell;
     } else {
@@ -1080,22 +1078,20 @@ function drawSelectBox(ctx, selectTool, mousePos) {
 
 
 function drawCells(ctx, net) {
-    // draw the back of the cells
-    ctx.strokeStyle = '#000000';
-    ctx.fillStyle = '#FFFFFF';
-
+    // draw the back of the cells  
     // firing and quiet
-    drawCellPaths(ctx, net, false, false);
-    drawCellPaths(ctx, net, false, true);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    drawCellBacks(ctx, net);
 
     // draw the front of the cells
-    // quiet
+    // quite
     ctx.fillStyle = '#444444';
-    drawCellPaths(ctx, net, true, false);
+    drawCellFronts(ctx, net, false);
 
     // firing
     ctx.fillStyle = '#FF0000';
-    drawCellPaths(ctx, net, true, true);
+    drawCellFronts(ctx, net, true);
 
     // draw the selected cells
     drawSelection(ctx, net, gSim.selection);
@@ -1124,33 +1120,60 @@ function drawCellLabels(ctx, net) {
     }
 }
 
-// draws the path for half the cell
-// ctx options are used to configure front or back style
-function drawCellPaths(ctx, net, frontPart, active) {
+function drawCellFronts(ctx, net, active) {
     var i;
     var cell;
     var cellFiring;
+    var clockwise;
+    var dir;
 
+    for (i = 0; i < net.cells.length; ++i)  {
+        cell = net.cells[i];
+        clockwise = (cell.angle === ANGLE_EAST);
+        cellFiring = net.state[i] ? true : false;
+
+        if (cellFiring !== active) {
+            continue;
+        }
+
+        ctx.beginPath();
+        ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 0.5, Math.PI * 1.5, clockwise);
+        ctx.fill();
+        ctx.stroke();
+
+/*
+        ctx.beginPath();
+        ctx.moveTo(cell.pos.x, cell.pos.y + cell.radius);
+        ctx.lineTo(cell.pos.x + cell.radius, cell.pos.y);
+        ctx.lineTo(cell.pos.x, cell.pos.y - cell.radius);
+        ctx.lineTo(cell.pos.x, cell.pos.y + cell.radius);
+        ctx.fill(); 
+        ctx.stroke();
+*/
+    }
+}
+
+// draws the path for half the cell
+// ctx options are used to configure front or back style
+function drawCellBacks(ctx, net) {
+    var i;
+    var cell;
     var clockwise;
 
     for (i = 0; i < net.cells.length; ++i)  {
         cell = net.cells[i];
-
-        cellFiring = net.state[i] ? true : false;
-
-        if (cellFiring === active) {
-
-            if (cell.angle === ANGLE_EAST) {
-                clockwise = frontPart;
-            }  else {
-                clockwise = !frontPart;
-            }
-
-            ctx.beginPath();
-            ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 0.5, Math.PI * 1.5, clockwise);
-            ctx.fill();
-            ctx.stroke();
+        if (cell.angle === ANGLE_EAST) {
+            clockwise = false;
+        }  else {
+            clockwise = true;
         }
+
+        ctx.beginPath();
+        ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 0.5, Math.PI * 1.5, clockwise);
+
+        //ctx.rect(cell.pos.x - cell.radius, cell.pos.y - cell.radius, cell.radius, cell.radius * 2.0);
+        ctx.fill();
+        ctx.stroke();
     }
 }
 
@@ -1272,15 +1295,22 @@ function drawFibers(ctx, net) {
 // the fiber connecting tool
 function drawPartialFiber(ctx, tool, mousePos) {
     var p = [];
+
+    var dir;
+
     if (tool.from) {
-        p[0] = new Vec(tool.from.pos.x + tool.from.radius, tool.from.pos.y);
-        p[1] = mousePos;
+        dir = Vec.fromAngle(tool.from.angle);
+        p[0] = Vec.add(tool.from.pos, Vec.scale(dir, tool.from.radius));
+        p[3] = mousePos;
     } else {
+        dir = Vec.fromAngle(tool.to.angle); 
         p[0] = mousePos;
-        p[1] = new Vec(tool.to.pos.x - tool.to.radius, tool.to.pos.y);
+        p[3] = Vec.add(tool.to.pos, Vec.scale(dir, -tool.to.radius));
     }
 
-    var fudge = Vec.dist(p[0], p[1]) * 0.4;
+    var fudge = Vec.dist(p[0], p[3]) * 0.4;
+    p[1] = Vec.add(p[0], Vec.scale(dir, fudge));
+    p[2] = Vec.add(p[3], Vec.scale(dir, -fudge));
 
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
@@ -1288,9 +1318,9 @@ function drawPartialFiber(ctx, tool, mousePos) {
 
     ctx.beginPath();
     ctx.moveTo(p[0].x, p[0].y);
-    ctx.bezierCurveTo(p[0].x + fudge, p[0].y,
-                      p[1].x - fudge, p[1].y,
-                      p[1].x, p[1].y);
+    ctx.bezierCurveTo(p[1].x, p[1].y,
+                      p[2].x, p[2].y,
+                      p[3].x, p[3].y);
     ctx.stroke();
     ctx.lineWidth = 1;
     ctx.setLineDash([]);
@@ -1326,7 +1356,10 @@ function drawConnectorPaths(ctx, net, active) {
     var fiberActive;
     var tuple;
     var p;
+    var dir;
     var outputType;
+    var radius = 4.0;
+    var origin;
 
     for (i = 0; i < net.fibers.length; ++i) {
         fiber = net.fibers[i];
@@ -1336,8 +1369,11 @@ function drawConnectorPaths(ctx, net, active) {
         outputType = fiber.to.inputTypes[fiber.outputIndex];
 
         if (outputType === INPUT_INHIBIT && fiberActive === active) {
+            dir = Vec.fromAngle(fiber.to.angle);
+            origin = Vec.add(p[3], Vec.scale(dir, -radius));
+
             ctx.beginPath();
-            ctx.arc(p[3].x - 4.0, p[3].y, 4.0, 0.0, Math.PI * 2.0, false);
+            ctx.arc(origin.x, origin.y, radius, 0.0, Math.PI * 2.0, false);
             ctx.fill();
             ctx.stroke();
         }
