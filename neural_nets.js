@@ -549,25 +549,35 @@ SelectTool.prototype.mouseUp = function(e) {
 
 function MoveTool(sim, e) {
     this.sim = sim;
-    this.initialPos = this.sim.mousePos;
-    this.previousPos = this.sim.mousePos;
+    this.initial = this.sim.mousePos;
+    this.previous = this.sim.mousePos;
 }
 
 MoveTool.prototype.mouseMove = function(e) {
     var i;
     var object;
-    var delta = Vec.sub(this.sim.mousePos, this.previousPos);
+    var delta = Vec.sub(this.sim.mousePos, this.previous);
 
     for (i = 0; i < this.sim.selection.length; ++i) {
         object = this.sim.selection[i];
         object.pos.add(delta);
     }
 
-    this.previousPos = this.sim.mousePos;
+    this.previous = this.sim.mousePos;
 };
 
 MoveTool.prototype.mouseUp = function(e) {
 
+};
+
+MoveTool.prototype.cancel = function() {
+    var i;
+    var invDelta = Vec.sub(this.initial, this.sim.mousePos);
+
+    for (i = 0; i < this.sim.selection.length; ++i) {
+        object = this.sim.selection[i];
+        object.pos.add(invDelta);
+    }    
 };
 
 function CreateTool(sim, e) {
@@ -669,7 +679,7 @@ function EditFiberTool(sim, e, obj) {
             }
         }
 
-        this.menu.classList.remove('active');
+        menu.classList.remove('active');
     };
 }
 
