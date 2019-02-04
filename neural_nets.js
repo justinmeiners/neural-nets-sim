@@ -599,6 +599,10 @@ function CreateTool(sim, e) {
 }
 
 CreateTool.prototype.mouseUp = function(e) {
+    this.cancel();
+};
+
+CreateTool.prototype.cancel = function() {
     this.menu.classList.remove('active');
 };
 
@@ -618,14 +622,19 @@ function EditCellTool(sim, e, obj) {
             action = e.target.getAttribute('data-action');
 
             if (action === 'delete') {
-                console.log(obj);
                 sim.net.removeCell(obj);
             }
         }
+
+        this.menu.classList.remove('active');
     };
 }
 
 EditCellTool.prototype.mouseUp = function(e) {
+    this.cancel();
+};
+
+EditCellTool.prototype.cancel = function() {
     this.menu.classList.remove('active');
 };
 
@@ -659,10 +668,16 @@ function EditFiberTool(sim, e, obj) {
                 obj.to.inputTypes[obj.outputIndex] = inputType;
             }
         }
+
+        this.menu.classList.remove('active');
     };
 }
 
 EditFiberTool.prototype.mouseUp = function(e) {
+    this.cancel();
+};
+
+EditFiberTool.prototype.cancel = function() {
     this.menu.classList.remove('active');
 };
 
@@ -809,11 +824,21 @@ function Sim() {
                    event.key === 'Backspace') {
             // delete selected cells
             this.deleteSelection();
+        } else if (event.key === 'Escape') {
+            if (this.tool && this.tool.cancel) {
+                this.tool.cancel();
+                delete this.tool;
+            }
         }
     }).bind(this));
 
     this.canvas.oncontextmenu = (function(e) {
         e.preventDefault();
+
+        if (this.tool && this.tool.cancel) {
+            this.tool.cancel();
+            delete this.tool;
+        }
 
         var mousePos = getMousePos(this.canvas, e);
 
@@ -911,6 +936,11 @@ Sim.prototype.step = function() {
 Sim.prototype.mouseDown = function(e) {
     var mousePos = getMousePos(this.canvas, e);
     this.mousePos = mousePos;
+
+    if (this.tool && this.tool.cancel) {
+        this.tool.cancel();
+        delete this.tool;
+    }
 
     var hit = this.net.cells.find(function (cell) {
         return cell.hits(mousePos);
