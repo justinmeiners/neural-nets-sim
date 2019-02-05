@@ -1,9 +1,10 @@
 # [neural-nets-sim](https://justinmeiners.github.io/neural-nets-sim)
 
 ![neural nets 1](papers/minsky_1.gif)
-![neural nets 2](papers/minksy_2.gif)
 
-Pages from [https://dl.acm.org/citation.cfm?id=1095587](Computation: finite and infinite machines) by Marvin Minsky.
+![neural nets 2](papers/minsky_2.gif)
+
+Pages from [Computation: finite and infinite machines](https://dl.acm.org/citation.cfm?id=1095587) by Marvin Minsky.
 
 # License
 
