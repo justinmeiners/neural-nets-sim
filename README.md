@@ -1,5 +1,7 @@
 # [neural-nets-sim](https://justinmeiners.github.io/neural-nets-sim)
 
+Created by: [Ryan Pendleton](https://github.com/rpendleton) & [Justin Meiners](https://github.com/justinmeiner)
+
 ![neural nets 1](papers/minsky_1.gif)
 
 ![neural nets 2](papers/minsky_2.gif)
