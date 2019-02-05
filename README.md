@@ -1,6 +1,6 @@
 # neural-nets-sim
 
-# [SEE HERE](https://justinmeiners.github.io/neural-nets-sim)
+**[SEE HERE](https://justinmeiners.github.io/neural-nets-sim)**
 
 # License
 
