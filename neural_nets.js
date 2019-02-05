@@ -175,7 +175,7 @@ Vec.min = function(a, b) {
 
 Vec.max = function(a, b) {
     return new Vec(Math.max(a.x, b.x), Math.max(a.y, b.y));
-}
+};
 
 Vec.dot = function(a, b) {
     return a.x * b.x + a.y * b.y;
@@ -235,7 +235,7 @@ function FiberView(i) {
     this.outputIndex = -1;
 
     // cache of
-    // beizer curve points
+    // bezier curve points
     // [p0, cp0, cp1, p1]
     this.bezierPoints = new Array(4);
 }
@@ -244,18 +244,18 @@ FiberView.prototype = Object.create(Fiber.prototype);
 
 // ATTEMPT 1: minimize distance between curve and point
 // I did the math for this one. 
-// Its relatively easy to get the derviative of
+// It is relatively easy to get the derivative of
 // D(t) = || B(t) - q ||^2
-// however actually minimzing that
+// however actually minimizing that
 // requires solving a cubic polynomial
 // and I don't want to mess around with Newton's method.
 
 // ATTEMPT 2: Use isPointInStroke
 // Maintaining the ctx state is awkward.
 // It also doesn't seem to account for lineWidth
-// correctly so its not very useable
+// correctly so its not very usable
 
-// ATTEMPT 3: Chop the bezier curve into line segements
+// ATTEMPT 3: Chop the bezier curve into line segments
 // and minimize the distance along each line.
 
 FiberView.prototype.hits = function(q) {
@@ -283,7 +283,7 @@ FiberView.prototype.hits = function(q) {
     var x1;
     var t;
 
-    // l: vector in direction of line segmeent
+    // l: vector in direction of line segment
     // d: delta from x0 to q
     // c: component of delta on l
     var l;
@@ -293,7 +293,7 @@ FiberView.prototype.hits = function(q) {
     for (var i = 1; i <= N; ++i) {
         t = i / N;
 
-        // line segement from x0 to x1 along the path
+        // line segment from x0 to x1 along the path
         x1 = Vec.bezier(t, p[0], p[1], p[2], p[3]);
 
         l = Vec.sub(x1, x0);
@@ -567,11 +567,9 @@ SelectTool.prototype.mouseUp = function(e) {
     var min = Vec.min(this.dragInitial, this.sim.mousePos);
     var max = Vec.max(this.dragInitial, this.sim.mousePos);
 
-    var sel = this.sim.net.cells.filter(function(cell) {
+    this.sim.selection = this.sim.net.cells.filter(function (cell) {
         return cell.pos.inBounds(min, max);
     });
-
-    this.sim.selection = sel;
 };
 
 function MoveTool(sim, e) {
@@ -599,6 +597,7 @@ MoveTool.prototype.mouseUp = function(e) {
 
 MoveTool.prototype.cancel = function() {
     var i;
+    var object;
     var invDelta = Vec.sub(this.initial, this.sim.mousePos);
 
     for (i = 0; i < this.sim.selection.length; ++i) {
@@ -697,7 +696,6 @@ function EditFiberTool(sim, e, obj) {
     this.menu.classList.add('active');
 
     this.menu.onclick = function(e) {
-        var j;
         var action;
         if (e.target.matches('li')) {
             action = e.target.getAttribute('data-action');
@@ -1142,7 +1140,6 @@ function drawCellFronts(ctx, net, active) {
     var cell;
     var cellFiring;
     var clockwise;
-    var dir;
 
     for (i = 0; i < net.cells.length; ++i)  {
         cell = net.cells[i];
@@ -1169,11 +1166,7 @@ function drawCellBacks(ctx, net) {
 
     for (i = 0; i < net.cells.length; ++i)  {
         cell = net.cells[i];
-        if (cell.angle === ANGLE_EAST) {
-            clockwise = false;
-        }  else {
-            clockwise = true;
-        }
+        clockwise = cell.angle !== ANGLE_EAST;
 
         ctx.beginPath();
         ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 0.5, Math.PI * 1.5, clockwise);
@@ -1184,6 +1177,7 @@ function drawCellBacks(ctx, net) {
 
 function drawCellArrows(ctx, net) {
     var i;
+    var cell;
     var dir;
 
     for (i = 0; i < net.cells.length; ++i) {
