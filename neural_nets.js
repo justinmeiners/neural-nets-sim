@@ -419,6 +419,11 @@ NetView.prototype.addBranch = function() {
     return branch;
 };
 
+// SERIALIZATION
+// =====================
+
+var SERIALIZATION_VERSION = 1;
+
 NetView.prototype.save = function() {
     var d = [];
     var i, j;
@@ -430,6 +435,7 @@ NetView.prototype.save = function() {
     // add a placeholder for the data length
     write(0);
 
+    write(SERIALIZATION_VERSION);
     write(this.cells.length);
     write(this.fibers.length);
 
@@ -444,7 +450,7 @@ NetView.prototype.save = function() {
         write(cell.inputs.length);
         for (j = 0; j < cell.inputs.length; ++j) {
             write(cell.inputs[j].index);
-            write(cell.inputTypes[j] == INPUT_INHIBIT ? INPUT_INHIBIT : INPUT_EXCITE);
+            write(cell.inputTypes[j] === INPUT_INHIBIT ? INPUT_INHIBIT : INPUT_EXCITE);
         }
 
         write(cell.outputs.length);
@@ -460,8 +466,8 @@ NetView.prototype.save = function() {
         write(fiber.to.index);
     }
 
-    // prefix the data with the length so that load can detect malformed data
-    d[0] = d.length;
+    // prefix the data with the number of bytes so that load can detect malformed data
+    d[0] = d.length * 2;
 
     var arr16 = new Uint16Array(d);
     var arr8 = new Uint8Array(arr16.buffer);
@@ -496,8 +502,13 @@ NetView.prototype.load = function(base64) {
         return d[++cursor];
     }
 
-    if (read() != d.length) {
+    if (read() !== d.length * 2) {
         // the data was in the wrong format or has been clipped
+        return false;
+    }
+
+    if (read() !== SERIALIZATION_VERSION) {
+        // the data was serialized using an unsupported version
         return false;
     }
 
