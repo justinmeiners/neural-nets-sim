@@ -10,7 +10,6 @@ var INPUT_INHIBIT = 1;
 
 function Cell(i) {
     this.index = i;
-
     this.inputs = [];
     this.inputTypes = [];
     this.outputs = [];
@@ -183,10 +182,10 @@ Vec.dot = function(a, b) {
 };
 
 Vec.bezier = function(t, p1, cp1, cp2, p2) {
-    var inv_t = 1.0 - t;
-    var a = Vec.scale(p1, inv_t * inv_t * inv_t);
-    var b = Vec.scale(cp1, 3.0 * inv_t * inv_t * t);
-    var c = Vec.scale(cp2, 3.0 * inv_t * t * t);
+    var tInv = 1.0 - t;
+    var a = Vec.scale(p1, tInv * tInv * tInv);
+    var b = Vec.scale(cp1, 3.0 * tInv * tInv * t);
+    var c = Vec.scale(cp2, 3.0 * tInv * t * t);
     var d = Vec.scale(p2, t * t * t);
     return Vec.add(a, Vec.add(b, Vec.add(c, d)));
 };
@@ -368,6 +367,7 @@ NetView.prototype.addCell = function() {
 
 NetView.prototype.removeCell = function(toDelete) {
     // detach all fibers
+    //
     // slicing is to make sure
     // the array isn't modified underneath us
     toDelete.inputs.slice().forEach(this.removeFiber.bind(this));
@@ -778,7 +778,6 @@ FiberTool.prototype.mouseUp = function(e) {
 
 // WINDOW AND CONTEXT
 // -------------------------
-//
 
 function getMousePos(canvas, e) {
     var rect = canvas.getBoundingClientRect();
@@ -845,11 +844,13 @@ function Sim() {
                    event.key === 'Backspace') {
             // delete selected cells
             this.deleteSelection();
+            e.preventDefault();
         } else if (event.key === 'Escape') {
             if (this.tool && this.tool.cancel) {
                 this.tool.cancel();
                 delete this.tool;
             }
+            e.preventDefault();
         }
     }).bind(this));
 
@@ -921,7 +922,11 @@ Sim.prototype.download = function(url) {
     };
 
     req.onload = (function() {
-        this.net.load(req.responseText.trim());
+        if (req.status < 400) {
+            this.net.load(req.responseText.trim());
+        } else {
+            alert('Could not download net. Error status: ' + req.status);
+        }
     }).bind(this);
 };
 
@@ -1011,13 +1016,11 @@ setInterval(function() {
     drawSim(gSim.ctx, gSim.canvas, gSim);
 }, 16);
 
-
 setInterval(function() {
     if (gSim.play) {
         gSim.step();
     }
 }, 500);
-
 
 // RENDERER
 // --------------------------
@@ -1025,7 +1028,6 @@ setInterval(function() {
 function drawSim(ctx, canvas, sim) {
     clearCanvas(ctx, canvas);
 
-    drawBranches(ctx, sim.net);
     drawFibers(ctx, sim.net);
     drawCells(ctx, sim.net);
 
@@ -1039,7 +1041,6 @@ function drawSim(ctx, canvas, sim) {
 
     drawHoverRing(ctx, sim.net, sim.mousePos);
 }
-
 
 function clearCanvas(ctx, canvas) {
     ctx.fillStyle = '#EFF0F1';
@@ -1088,7 +1089,6 @@ function drawSelectBox(ctx, selectTool, mousePos) {
 
     ctx.setLineDash([]);
 }
-
 
 function drawCells(ctx, net) {
     // draw the front of the cells
@@ -1157,16 +1157,6 @@ function drawCellFronts(ctx, net, active) {
         ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 0.5, Math.PI * 1.5, clockwise);
         ctx.fill();
         ctx.stroke();
-
-/*
-        ctx.beginPath();
-        ctx.moveTo(cell.pos.x, cell.pos.y + cell.radius);
-        ctx.lineTo(cell.pos.x + cell.radius, cell.pos.y);
-        ctx.lineTo(cell.pos.x, cell.pos.y - cell.radius);
-        ctx.lineTo(cell.pos.x, cell.pos.y + cell.radius);
-        ctx.fill(); 
-        ctx.stroke();
-*/
     }
 }
 
@@ -1209,21 +1199,20 @@ function drawCellArrows(ctx, net) {
 }
 
 function drawSelection(ctx, net, sel) {
-    ctx.lineWidth = 2;
-
     var i;
     var cell;
 
+    ctx.lineWidth = 2;
     for (i = 0; i < sel.length; ++i) {
         cell = sel[i];
         ctx.beginPath();
         ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 2.0, 0.0, false);
         ctx.stroke();
     }
-
     ctx.lineWidth = 1;
 }
 
+/*
 function drawBranches(ctx, net) {
     var i;
     var b;
@@ -1239,6 +1228,7 @@ function drawBranches(ctx, net) {
         ctx.stroke();
     }
 }
+*/
 
 function stackedOffset(spread, j, n) {
     return spread * (j - (n - 1) * 0.5);
@@ -1247,17 +1237,13 @@ function stackedOffset(spread, j, n) {
 // returns a list of tuples
 // [startPoint, endPoint, type]
 function updateFiberPoints(net) {
-    var i;
-    var j;
+    var i, j, N;
     var cell;
     var f;
-    var N;
     var fudge;
     var yOffset;
     var p;
-
-    var fromDir;
-    var toDir;
+    var fromDir, toDir;
 
    for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
@@ -1325,7 +1311,6 @@ function drawFibers(ctx, net) {
 // the fiber connecting tool
 function drawPartialFiber(ctx, tool, mousePos) {
     var p = [];
-
     var dir;
 
     if (tool.from) {
@@ -1384,7 +1369,6 @@ function drawConnectorPaths(ctx, net, active) {
     var i;
     var fiber;
     var fiberActive;
-    var tuple;
     var p;
     var dir;
     var outputType;
