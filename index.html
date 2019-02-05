@@ -122,14 +122,30 @@
                 <li><b>Create Neuron</b> Right click and select "New Neuron"</li>
                 <li><b>Move Neuron</b> Click and drag on a neuron.</li>
                 <li><b>Delete Neuron</b> Select a neuron and press the delete key.</li>
+                <li><b>Flip Neuron</b> Right click on a neuron and select "Flip".</li>
                 <li><b>Set Threshold</b> Select a neuron and press a number key (0-9).</li>
                 <li><b>Create Fiber</b> Hover near the outside of a cell. Click and drag to create a fiber.</li>
+                <li><b>Delete Fiber</b> Right click on a fiber and select "Delete"</li>
+                <li><b>Toggle Inhibit/Excite</b> Right click on a fiber and select "Toggle"</li>
             </ul>
 
             <h2>Examples</h2>
 
+
+            In many of the examples, you need to get them started by turning on one of the input fibers by setting its threhold to 0. Most also come with a reset fiber which you can use to turn it off.
+
             <ul>
-                <li><a href="?d=/examples/unary_scaler.net">Unary Scaler</a></li>
+                <li>
+                    <a href="?d=examples/memory_gate.net">Memory Gate</a>
+                    a switch which remembers when it has been turned on.
+                </li>
+                <li>
+                    <a href="?d=examples/unary_scaler.net">Unary Scaler</a>
+                    produces one pulse for every N. However, it uses a lot of neurons.
+                </li>
+                <li><a href="?d=examples/binary_scaler.net">Binary Scaler</a>
+                    produces one pulse for every 2. But, it can be combined effeciently.
+                </li>
             </ul>
 
             You can share your own neural nets too! Copy the saved text to an online location (like a Gist)
