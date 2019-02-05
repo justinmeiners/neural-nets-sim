@@ -891,7 +891,8 @@ function Sim() {
     if (downloadUrl && downloadUrl.length > 0) {
         this.download(downloadUrl);
     } else {
-        this.net.load(DefaultNet);}
+        this.net.load(DefaultNet);
+    }
 }
 
 Sim.prototype.togglePlay = function() {
@@ -1172,7 +1173,7 @@ function drawCellBacks(ctx, net) {
         ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 0.5, Math.PI * 1.5, clockwise);
         ctx.fill();
         ctx.stroke();
-   }
+    }
 }
 
 function drawCellArrows(ctx, net) {
@@ -1239,7 +1240,7 @@ function updateFiberPoints(net) {
     var p;
     var fromDir, toDir;
 
-   for (i = 0; i < net.cells.length; ++i) {
+    for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
         N = cell.inputs.length;
 
