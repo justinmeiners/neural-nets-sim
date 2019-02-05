@@ -940,7 +940,7 @@ Sim.prototype.download = function(url) {
     req.send();
 
     req.onerror = function(err) {
-        alert(err.message);
+        alert('Could not download net. Unknown XHR network error.');
     };
 
     req.onload = (function() {
