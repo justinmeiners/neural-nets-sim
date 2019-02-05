@@ -233,7 +233,7 @@ function FiberView(i) {
     // don't set this.
     // Its driven by the inputTypes
     // on cell
-    this.ouputIndex = -1;
+    this.outputIndex = -1;
 
     // cache of
     // beizer curve points
@@ -368,8 +368,10 @@ NetView.prototype.addCell = function() {
 
 NetView.prototype.removeCell = function(toDelete) {
     // detach all fibers
-    toDelete.inputs.forEach(this.removeFiber.bind(this));
-    toDelete.outputs.forEach(this.removeFiber.bind(this));
+    // slicing is to make sure
+    // the array isn't modified underneath us
+    toDelete.inputs.slice().forEach(this.removeFiber.bind(this));
+    toDelete.outputs.slice().forEach(this.removeFiber.bind(this));
 
     // algorithm Ryan thought up
     // 1. when you delete an item
@@ -1078,22 +1080,26 @@ function drawSelectBox(ctx, selectTool, mousePos) {
 
 
 function drawCells(ctx, net) {
-    // draw the back of the cells  
-    // firing and quiet
-    ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#000000';
-    drawCellBacks(ctx, net);
-
     // draw the front of the cells
     // quite
     ctx.fillStyle = '#444444';
+    ctx.strokeStyle = '#000000';
     drawCellFronts(ctx, net, false);
 
     // firing
     ctx.fillStyle = '#FF0000';
     drawCellFronts(ctx, net, true);
 
+    // draw the back of the cells  
+    // firing and quiet
+    ctx.fillStyle = '#FFFFFF';
+    drawCellBacks(ctx, net);
+
+    ctx.strokeStyle = '#FFFFFF';
+    drawCellArrows(ctx, net);
+
     // draw the selected cells
+    ctx.strokeStyle = '#009900';
     drawSelection(ctx, net, gSim.selection);
 
     // draw the text
@@ -1170,15 +1176,28 @@ function drawCellBacks(ctx, net) {
 
         ctx.beginPath();
         ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 0.5, Math.PI * 1.5, clockwise);
-
-        //ctx.rect(cell.pos.x - cell.radius, cell.pos.y - cell.radius, cell.radius, cell.radius * 2.0);
         ctx.fill();
+        ctx.stroke();
+   }
+}
+
+function drawCellArrows(ctx, net) {
+    var i;
+    var dir;
+
+    for (i = 0; i < net.cells.length; ++i) {
+        cell = net.cells[i];
+        dir = Vec.fromAngle(cell.angle);
+
+        ctx.beginPath();
+        ctx.moveTo(cell.pos.x + dir.x * 4.0, cell.pos.y + cell.radius * 0.4);
+        ctx.lineTo(cell.pos.x + dir.x * cell.radius * 0.6, cell.pos.y);
+        ctx.lineTo(cell.pos.x + dir.x * 4.0, cell.pos.y - cell.radius * 0.4);
         ctx.stroke();
     }
 }
 
 function drawSelection(ctx, net, sel) {
-    ctx.strokeStyle = '#009900';
     ctx.lineWidth = 2;
 
     var i;
