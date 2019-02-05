@@ -562,16 +562,16 @@ function messageForSerializationError(error) {
             return null;
 
         case SERIALIZATION_INVALID_BASE64:
-            return 'Could not download net. Failed to base64 decode.';
+            return 'Could not load net. Failed to base64 decode.';
 
         case SERIALIZATION_INVALID_LENGTH:
-            return 'Could not download net. Incorrect checksum or length.';
+            return 'Could not load net. Incorrect checksum or length.';
 
         case SERIALIZATION_INVALID_VERSION:
-            return 'Could not download net. Unsupported serialization version.';
+            return 'Could not load net. Unsupported serialization version.';
 
         default:
-            return 'Could not download net. Unexpected serialization error.';
+            return 'Could not load net. Unexpected serialization error.';
     }
 }
 
