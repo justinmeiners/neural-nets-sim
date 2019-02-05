@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
         <title>McCulloch & Pitts Neural Net Simulator</title>
 
@@ -36,14 +36,14 @@
 
             -webkit-user-select: none;
             -moz-user-select: none;
-            -ms-user-selection: none;
+            -ms-user-select: none;
             user-select: none;
         }
 
         .context-menu ul {
             list-style: none;  
             padding: 8px;
-            margin: 0px;
+            margin: 0;
         }
 
         .context-menu ul li {
@@ -115,7 +115,7 @@
             <p> 
                Each <b>neuron</b> has input <b>fibers</b> and output fibers which connect it to other neurons.
                A neuron fires after it receives a number of signals from its input fibers, greater or equal to its threshold (the number written on it.)
-               Fibers which have a circle at the end are called <b>inhibiatory</b> fibers. If a neuron recieves an inhibitory signal, it will not fire, regardless of how many signals it recieves. 
+               Fibers which have a circle at the end are called <b>inhibitory</b> fibers. If a neuron receives an inhibitory signal, it will not fire, regardless of how many signals it receives.
             </p>
 
             <ul>
@@ -142,7 +142,7 @@
             <p>
             <a href="https://en.wikipedia.org/wiki/Warren_Sturgis_McCulloch">McCulloch</a> and 
             <a href="https://en.wikipedia.org/wiki/Walter_Pitts">Pitts</a> 
-            were researchers in neuroscience who became <a href="https://www.dlsi.ua.es//~mlf/nnafmc/pbook/node10.html">pioneers in artifical intelligence.</a>
+            were researchers in neuroscience who became <a href="https://www.dlsi.ua.es//~mlf/nnafmc/pbook/node10.html">pioneers in artificial intelligence.</a>
             In 1943 they created a <a href="papers/mcp.pdf">computation model</a> of how neurons fire in our brains.
             This project is a simulator of that model.
             </p>
@@ -152,18 +152,17 @@
 
             <p>
                 Even though these neural nets are inspired by biology, they aren't an accurate representation of their physical properties. They are a simplification for computational purposes.
-
                 Marvin Minsky says:
-
-                <blockquote>
-                    It should be understood clearly that neither McCulloch, Pitts, nor the present writer considers these devices and machines to serve as accurate physiological models of nerve cells and tissues. They were not designed with that purpose in mind. They are designed for the representation and analysis of the logic of situations that arise in any discrete process, be it in brain, computer, or anywhere else. In theories which are more seriously intended to be brain models, the “neurons” have to be much more complicated. The real biological neuron is much more complex than our simple
-                    logical units for the evolution of nerve cells has led to very intricate and specialized organs.
-                  </blockquote>
             </p>
 
+            <blockquote>
+                It should be understood clearly that neither McCulloch, Pitts, nor the present writer considers these devices and machines to serve as accurate physiological models of nerve cells and tissues. They were not designed with that purpose in mind. They are designed for the representation and analysis of the logic of situations that arise in any discrete process, be it in brain, computer, or anywhere else. In theories which are more seriously intended to be brain models, the “neurons” have to be much more complicated. The real biological neuron is much more complex than our simple
+                logical units for the evolution of nerve cells has led to very intricate and specialized organs.
+            </blockquote>
+
             <p>
-            Their work later became important in the Theory of Computation. In 1951, <a href="https://en.wikipedia.org/wiki/Stephen_Cole_Kleene">Kleene</a> proved that the 
-            patterns which are recognizable by the neural nets are precisely the <a href="papers/kleene.pdf">Regular Expressions</a>. This is commonly known as <a href="https://www.cs.odu.edu/~toida/nerzic/390teched/regular/fa/kleene-1.html">Kleene's Theorem</a>. Finite state machines and neural nets are computationally equivalent.
+                Their work later became important in the Theory of Computation. In 1951, <a href="https://en.wikipedia.org/wiki/Stephen_Cole_Kleene">Kleene</a> proved that the
+                patterns which are recognizable by the neural nets are precisely the <a href="papers/kleene.pdf">Regular Expressions</a>. This is commonly known as <a href="https://www.cs.odu.edu/~toida/nerzic/390teched/regular/fa/kleene-1.html">Kleene's Theorem</a>. Finite state machines and neural nets are computationally equivalent.
             </p>
 
             <p>
