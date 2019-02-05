@@ -425,6 +425,10 @@ NetView.prototype.addBranch = function() {
 // =====================
 
 var SERIALIZATION_VERSION = 1;
+var SERIALIZATION_SUCCESS = true;
+var SERIALIZATION_INVALID_BASE64 = -1;
+var SERIALIZATION_INVALID_LENGTH = -2;
+var SERIALIZATION_INVALID_VERSION = -3;
 
 NetView.prototype.save = function() {
     var d = [];
@@ -487,8 +491,7 @@ NetView.prototype.load = function(base64) {
     try {
         str = atob(base64);
     } catch (e) {
-        // a base64 error occurred
-        return false;
+        return SERIALIZATION_INVALID_BASE64;
     }
 
     var arr8 = new Uint8Array(str.length);
@@ -505,13 +508,11 @@ NetView.prototype.load = function(base64) {
     }
 
     if (read() !== d.length * 2) {
-        // the data was in the wrong format or has been clipped
-        return false;
+        return SERIALIZATION_INVALID_LENGTH;
     }
 
     if (read() !== SERIALIZATION_VERSION) {
-        // the data was serialized using an unsupported version
-        return false;
+        return SERIALIZATION_INVALID_VERSION;
     }
 
     this.cells = new Array(read());
@@ -552,8 +553,27 @@ NetView.prototype.load = function(base64) {
         fiber.to = this.cells[read()];
     }
 
-    return true;
+    return SERIALIZATION_SUCCESS;
 };
+
+function messageForSerializationError(error) {
+    switch (error) {
+        case SERIALIZATION_SUCCESS:
+            return null;
+
+        case SERIALIZATION_INVALID_BASE64:
+            return 'Could not download net. Failed to base64 decode.';
+
+        case SERIALIZATION_INVALID_LENGTH:
+            return 'Could not download net. Incorrect checksum or length.';
+
+        case SERIALIZATION_INVALID_VERSION:
+            return 'Could not download net. Unsupported serialization version.';
+
+        default:
+            return 'Could not download net. Unexpected serialization error.';
+    }
+}
 
 // TOOLS
 // =====================
@@ -921,8 +941,14 @@ Sim.prototype.download = function(url) {
     };
 
     req.onload = (function() {
-        if (req.status < 400) {
-            this.net.load(req.responseText.trim());
+        var ret;
+
+        if (req.status === 200) {
+            ret = this.net.load(req.responseText.trim());
+
+            if (ret !== SERIALIZATION_SUCCESS) {
+                alert(messageForSerializationError(ret));
+            }
         } else {
             alert('Could not download net. Error status: ' + req.status);
         }
@@ -930,10 +956,12 @@ Sim.prototype.download = function(url) {
 };
 
 Sim.prototype.load = function() {
-    if (this.net.load(this.storageInput.value)) {
+    var ret = this.net.load(this.storageInput.value);
+
+    if (ret === SERIALIZATION_SUCCESS) {
         this.restart();
     } else {
-        alert('The data provided was malformed.');
+        alert(messageForSerializationError(ret));
     }
 };
 
