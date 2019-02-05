@@ -841,7 +841,10 @@ function Sim() {
 
     window.addEventListener('keydown', (function(e) {
         var num;
-        if (e.key === 's') {
+
+        if (document.activeElement !== document.body || e.metaKey) {
+            // do nothing in case the text field is focused or the user is holding a modifier
+        } else if (e.key === 's') {
             // step hotkey
             this.step();
             e.preventDefault();
