@@ -1,10 +1,15 @@
 # [neural-nets-sim](https://justinmeiners.github.io/neural-nets-sim)
 
+![neural nets 1](papers/minsky_1.gif)
+![neural nets 2](papers/minksy_2.gif)
+
+Pages from [https://dl.acm.org/citation.cfm?id=1095587](Computation: finite and infinite machines) by Marvin Minsky.
+
 # License
 
 This code is licensed under [GPL v3.0](LICENSE).
 
-# Public List
+# Neural Net List
 
 This is a list where you can contribute your own neural nets. Simply host them some place that is publically accessible (Like a Gist) and add a link to it:
 
