@@ -67,18 +67,26 @@
             margin-top: 0.25rem;
         }
 
+        .labelInput {
+            visibility: hidden;
+            position: absolute;
+        }
+
+
+
     </style>
     </head>
 
     <body>
         <div id="content">
             <h2>McCulloch &amp; Pitts Neural Net Simulator</h2>
-
+            <input type="text" class="labelInput">
             <canvas id="main-canvas" width="800" height="600"></canvas>
 
             <div id='new-menu' class="context-menu"> 
                 <ul>
                     <li data-action="new-cell">New Neuron</li>
+                    <li data-action="new-textLabel">New Label</li>
                 </ul>
             </div>
 

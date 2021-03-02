@@ -16,6 +16,12 @@ function Cell(i) {
     this.threshold = 1;
 }
 
+function Label(i) {
+    console.log("Label Class");
+    this.index = i;
+    this.text = "HelloWorld";
+}
+
 function Fiber(i) {
     this.index = i;
     this.from = null;
@@ -32,6 +38,7 @@ function Net() {
     this.cells = [];
     this.fibers = [];
     this.branches = [];
+    this.labels = [];
 }
 
 function visitFibers(fiber, f) {
@@ -225,6 +232,12 @@ CellView.prototype.hitsConnectors = function(p) {
     return p.inCircle(this.pos, this.radius + this.connectorPadding);
 };
 
+function LabelView(i) {
+    console.log("labelview class")
+    Label.call(this, i);
+    this.pos = new Vec(0,0);
+}
+
 
 function FiberView(i) {
     Fiber.call(this, i);
@@ -357,6 +370,12 @@ NetView.prototype.restart = function() {
     this.signals = [];
     this.time = 0;
 };
+
+NetView.prototype.addTextLabel = function() {
+    var label = new LabelView(this.labels.length)
+    this.labels.push(label);
+    return label;
+}
 
 
 NetView.prototype.addCell = function() {
@@ -647,6 +666,9 @@ function CreateTool(sim, e) {
             } else if (action === 'new-branch') {
                 added = sim.net.addBranch();
                 added.pos = canvasLoc;
+            } else if (action == 'new-textLabel') {
+                added = sim.net.addTextLabel();
+                added.pos = canvasLoc;
             }
 
             menu.classList.remove('active');
@@ -793,6 +815,10 @@ FiberTool.prototype.mouseUp = function(e) {
     this.to.inputs.push(f);
     this.to.inputTypes.push(INPUT_EXCITE);
 };
+
+function AddLabelTool(sim, e, obj){
+
+}
 
 // WINDOW AND CONTEXT
 // -------------------------
@@ -1070,6 +1096,8 @@ function drawSim(ctx, canvas, sim) {
     }
 
     drawHoverRing(ctx, sim.net, sim.mousePos);
+    //TODO draw labels
+    drawTextLabels(ctx, sim.net);
 }
 
 function clearCanvas(ctx, canvas) {
@@ -1118,6 +1146,16 @@ function drawSelectBox(ctx, selectTool, mousePos) {
     ctx.stroke();
 
     ctx.setLineDash([]);
+}
+
+function drawTextLabels(ctx, net){
+    //console.log("num of labels");
+    //console.log(net.labels.length);
+    for(i = 0; i < net.labels.length; i++){
+        label = net.labels[i];
+        ctx.font = '14pt monospace';
+        ctx.fillText(net.labels[i].text, label.pos.x, label.pos.y);
+    }
 }
 
 function drawCells(ctx, net) {
