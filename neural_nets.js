@@ -665,12 +665,9 @@ function CreateTool(sim, e) {
                 added.pos = canvasLoc;
             } else if (action == 'new-textLabel') {
                 var textInput = CreateTool.createTextInputElement(sim);
-                textInput.addEventListener("focusout", function(){
-                    added = sim.net.addTextLabel()
-                    added.pos = canvasLoc;
-                    added.text = textInput.value;
-                    textInput.remove();
-                });
+                added = sim.net.addTextLabel();
+                EditLabelTool.editLabel(textInput, added, canvasLoc);
+                
             }
 
             menu.classList.remove('active');
@@ -680,8 +677,7 @@ function CreateTool(sim, e) {
     
 }
 
-CreateTool.createTextInputElement = function(sim)
-    {
+CreateTool.createTextInputElement = function(sim){
         var textInput = document.createElement("INPUT");
         textInput.setAttribute("type", "text");
         textInput.style.position = "absolute";
@@ -689,9 +685,8 @@ CreateTool.createTextInputElement = function(sim)
         textInput.style.top = sim.mousePos.y+ rect.top + "px";
         textInput.style.left = sim.mousePos.x + rect.left + "px";
         document.body.appendChild(textInput);
-        textInput.focus();
         return textInput;
-    }
+};
 
 CreateTool.prototype.mouseUp = function(e) {
     this.cancel();
@@ -700,6 +695,20 @@ CreateTool.prototype.mouseUp = function(e) {
 CreateTool.prototype.cancel = function() {
     this.menu.classList.remove('active');
 };
+
+function EditLabelTool(){
+
+}
+
+EditLabelTool.editLabel = function(input, toEdit, newLoc) {
+    input.focus();
+    input.addEventListener("focusout", function(){
+        toEdit.text = input.value;
+        toEdit.pos = newLoc;
+        input.remove();
+    });
+};
+
 
 
 function EditCellTool(sim, e, obj) {
@@ -1168,8 +1177,8 @@ function drawSelectBox(ctx, selectTool, mousePos) {
 
 function drawTextLabels(ctx, net){
     ctx.font = '14pt monospace';
-    ctx.fillStyle = '#ffffff';
-    for( i = 0; i < net.labels.length; i++){
+    ctx.fillStyle = '#000000';
+    for(var i = 0; i < net.labels.length; i++){
         label = net.labels[i];
         ctx.fillText(net.labels[i].text, label.pos.x, label.pos.y);
     }
