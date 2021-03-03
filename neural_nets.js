@@ -16,10 +16,8 @@ function Cell(i) {
     this.threshold = 1;
 }
 
-function Label(i) {
-    console.log("Label Class");
-    this.index = i;
-    this.text = "HelloWorld";
+function Label() {
+    this.text = "";
 }
 
 function Fiber(i) {
@@ -232,9 +230,8 @@ CellView.prototype.hitsConnectors = function(p) {
     return p.inCircle(this.pos, this.radius + this.connectorPadding);
 };
 
-function LabelView(i) {
-    console.log("labelview class")
-    Label.call(this, i);
+function LabelView() {
+    Label.call(this);
     this.pos = new Vec(0,0);
 }
 
@@ -372,7 +369,7 @@ NetView.prototype.restart = function() {
 };
 
 NetView.prototype.addTextLabel = function() {
-    var label = new LabelView(this.labels.length)
+    var label = new LabelView();
     this.labels.push(label);
     return label;
 }
@@ -667,14 +664,34 @@ function CreateTool(sim, e) {
                 added = sim.net.addBranch();
                 added.pos = canvasLoc;
             } else if (action == 'new-textLabel') {
-                added = sim.net.addTextLabel();
-                added.pos = canvasLoc;
+                var textInput = CreateTool.createTextInputElement(sim);
+                textInput.addEventListener("focusout", function(){
+                    added = sim.net.addTextLabel()
+                    added.pos = canvasLoc;
+                    added.text = textInput.value;
+                    textInput.remove();
+                });
             }
 
             menu.classList.remove('active');
         }
     };
+
+    
 }
+
+CreateTool.createTextInputElement = function(sim)
+    {
+        var textInput = document.createElement("INPUT");
+        textInput.setAttribute("type", "text");
+        textInput.style.position = "absolute";
+        var rect = sim.canvas.getBoundingClientRect();
+        textInput.style.top = sim.mousePos.y+ rect.top + "px";
+        textInput.style.left = sim.mousePos.x + rect.left + "px";
+        document.body.appendChild(textInput);
+        textInput.focus();
+        return textInput;
+    }
 
 CreateTool.prototype.mouseUp = function(e) {
     this.cancel();
@@ -683,6 +700,7 @@ CreateTool.prototype.mouseUp = function(e) {
 CreateTool.prototype.cancel = function() {
     this.menu.classList.remove('active');
 };
+
 
 function EditCellTool(sim, e, obj) {
     var menu = document.getElementById('edit-menu');
@@ -1149,8 +1167,6 @@ function drawSelectBox(ctx, selectTool, mousePos) {
 }
 
 function drawTextLabels(ctx, net){
-    //console.log("num of labels");
-    //console.log(net.labels.length);
     for(i = 0; i < net.labels.length; i++){
         label = net.labels[i];
         ctx.font = '14pt monospace';
