@@ -1167,9 +1167,10 @@ function drawSelectBox(ctx, selectTool, mousePos) {
 }
 
 function drawTextLabels(ctx, net){
-    for(i = 0; i < net.labels.length; i++){
+    ctx.font = '14pt monospace';
+    ctx.fillStyle = '#ffffff';
+    for( i = 0; i < net.labels.length; i++){
         label = net.labels[i];
-        ctx.font = '14pt monospace';
         ctx.fillText(net.labels[i].text, label.pos.x, label.pos.y);
     }
 }
