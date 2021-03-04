@@ -235,6 +235,12 @@ function LabelView() {
     this.pos = new Vec(0,0);
 }
 
+LabelView.radius = 25.0;
+
+LabelView.prototype.hits = function(p) {
+    return p.inCircle(this.pos, 25.0);
+}
+
 
 function FiberView(i) {
     Fiber.call(this, i);
@@ -696,7 +702,7 @@ CreateTool.prototype.cancel = function() {
     this.menu.classList.remove('active');
 };
 
-function EditLabelTool(){
+function EditLabelTool(sim, e, obj){
 
 }
 
@@ -843,9 +849,7 @@ FiberTool.prototype.mouseUp = function(e) {
     this.to.inputTypes.push(INPUT_EXCITE);
 };
 
-function AddLabelTool(sim, e, obj){
 
-}
 
 // WINDOW AND CONTEXT
 // -------------------------
@@ -942,8 +946,14 @@ function Sim() {
             return cell.hits(mousePos);
         });
 
+        var labelHit = this.net.labels.find(function (label) {
+            return label.hits(mousePos);
+        });
+
         if (hit) {
             this.tool = new EditCellTool(this, e, hit);
+        }else if(labelHit){
+            this.tool = new EditLabelTool(this, e, hit);
         } else {
             hit = this.net.fibers.find(function (fiber) {
                 return fiber.hits(mousePos);
@@ -1058,6 +1068,10 @@ Sim.prototype.mouseDown = function(e) {
         return cell.hitsConnectors(mousePos);
     });
 
+    var labelHit = this.net.labels.find(function (label) {
+        return label.hits(mousePos);
+    });
+
     if (hit) {
         var index = this.selection.indexOf(hit);
 
@@ -1066,6 +1080,15 @@ Sim.prototype.mouseDown = function(e) {
         }
 
         this.tool = new MoveTool(this, e);
+    } else if (labelHit) { 
+        var index = this.selection.indexOf(labelHit);
+
+        if (index === -1) {
+            this.selection = [labelHit];
+        }
+
+        this.tool = new MoveTool(this, e);
+        
     } else if (connectHit) {
         this.tool = new FiberTool(this, e, connectHit);
     } else {
@@ -1123,7 +1146,6 @@ function drawSim(ctx, canvas, sim) {
     }
 
     drawHoverRing(ctx, sim.net, sim.mousePos);
-    //TODO draw labels
     drawTextLabels(ctx, sim.net);
 }
 
