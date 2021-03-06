@@ -237,8 +237,15 @@ function LabelView() {
 
 LabelView.radius = 25.0;
 
-LabelView.prototype.hits = function(p) {
-    return p.inCircle(this.pos, 25.0);
+LabelView.prototype.hits = function(mousePos, fontsize) {
+    var halflen = this.text.length/2.0;
+    var min= new Vec(this.pos.x, this.pos.y);
+    var max = new Vec(this.pos.x, this.pos.y);
+    min.x -= halflen*fontsize + 3;
+    min.y -= (fontsize/2.0) + 3;
+    max.x += halflen*fontsize + 3;
+    max.y += (fontsize/2.0) + 3;
+    return mousePos.inBounds(min, max);
 }
 
 
@@ -670,9 +677,8 @@ function CreateTool(sim, e) {
                 added = sim.net.addBranch();
                 added.pos = canvasLoc;
             } else if (action == 'new-textLabel') {
-                var textInput = CreateTool.createTextInputElement(sim);
                 added = sim.net.addTextLabel();
-                EditLabelTool.editLabel(textInput, added, canvasLoc);
+                EditLabelTool.editLabel(sim, added, canvasLoc);
                 
             }
 
@@ -683,7 +689,48 @@ function CreateTool(sim, e) {
     
 }
 
-CreateTool.createTextInputElement = function(sim){
+CreateTool.prototype.mouseUp = function(e) {
+    this.cancel();
+};
+
+CreateTool.prototype.cancel = function() {
+    this.menu.classList.remove('active');
+};
+
+function EditLabelTool(sim, e, obj){
+    var menu = document.getElementById('edit-label-menu');
+
+    this.label = obj;
+
+    this.menu = menu;
+    this.menu.style.left = e.pageX + 'px';
+    this.menu.style.top = e.pageY + 'px';
+    this.menu.classList.add('active');
+
+    this.menu.onclick = function(e) {
+        var action;
+        if(e.target.matches('li')){
+            action = e.target.getAttribute('data-action');
+
+            if(action === 'edit'){
+                EditLabelTool.editLabel(sim,label,null);
+            }
+        }
+        menu.classList.remove('active');
+    }
+
+}
+
+EditLabelTool.prototype.mouseUp = function(e) {
+    this.cancel();
+};
+
+EditLabelTool.prototype.cancel = function() {
+    this.menu.classList.remove('active');
+};
+
+
+EditLabelTool.createTextInputElement = function(sim){
         var textInput = document.createElement("INPUT");
         textInput.setAttribute("type", "text");
         textInput.style.position = "absolute";
@@ -694,23 +741,15 @@ CreateTool.createTextInputElement = function(sim){
         return textInput;
 };
 
-CreateTool.prototype.mouseUp = function(e) {
-    this.cancel();
-};
 
-CreateTool.prototype.cancel = function() {
-    this.menu.classList.remove('active');
-};
-
-function EditLabelTool(sim, e, obj){
-
-}
-
-EditLabelTool.editLabel = function(input, toEdit, newLoc) {
+EditLabelTool.editLabel = function(sim, toEdit, newLoc) {
+    var input = EditLabelTool.createTextInputElement(sim);
     input.focus();
     input.addEventListener("focusout", function(){
         toEdit.text = input.value;
-        toEdit.pos = newLoc;
+        if(newLoc){
+            toEdit.pos = newLoc;
+        }
         input.remove();
     });
 };
@@ -866,6 +905,7 @@ function Sim() {
     this.play = true;
 
     this.mousePos = new Vec(0, 0);
+    this.fontsize = 14.0;
 
     this.playBtn = document.getElementById('play-btn');
     this.playBtn.onclick = this.togglePlay.bind(this);
@@ -946,14 +986,15 @@ function Sim() {
             return cell.hits(mousePos);
         });
 
+        var fontsize = this.fontsize;
         var labelHit = this.net.labels.find(function (label) {
-            return label.hits(mousePos);
+            return label.hits(mousePos, fontsize);
         });
 
         if (hit) {
             this.tool = new EditCellTool(this, e, hit);
         }else if(labelHit){
-            this.tool = new EditLabelTool(this, e, hit);
+            this.tool = new EditLabelTool(this, e, labelHit);
         } else {
             hit = this.net.fibers.find(function (fiber) {
                 return fiber.hits(mousePos);
@@ -1067,9 +1108,10 @@ Sim.prototype.mouseDown = function(e) {
     var connectHit = this.net.cells.find(function (cell) {
         return cell.hitsConnectors(mousePos);
     });
-
+    
+    var fontSize = this.fontsize;
     var labelHit = this.net.labels.find(function (label) {
-        return label.hits(mousePos);
+        return label.hits(mousePos,fontSize);
     });
 
     if (hit) {
@@ -1146,7 +1188,7 @@ function drawSim(ctx, canvas, sim) {
     }
 
     drawHoverRing(ctx, sim.net, sim.mousePos);
-    drawTextLabels(ctx, sim.net);
+    drawTextLabels(ctx, sim.net, sim.fontsize);
 }
 
 function clearCanvas(ctx, canvas) {
@@ -1197,8 +1239,8 @@ function drawSelectBox(ctx, selectTool, mousePos) {
     ctx.setLineDash([]);
 }
 
-function drawTextLabels(ctx, net){
-    ctx.font = '14pt monospace';
+function drawTextLabels(ctx, net, fontsize){
+    ctx.font =  fontsize + 'pt monospace';
     ctx.fillStyle = '#000000';
     for(var i = 0; i < net.labels.length; i++){
         label = net.labels[i];
