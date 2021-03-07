@@ -461,7 +461,7 @@ NetView.prototype.addBranch = function() {
 // SERIALIZATION
 // =====================
 
-var SERIALIZATION_VERSION = 1;
+var SERIALIZATION_VERSION = 2;
 var SERIALIZATION_SUCCESS = true;
 var SERIALIZATION_INVALID_BASE64 = -1;
 var SERIALIZATION_INVALID_LENGTH = -2;
@@ -477,10 +477,13 @@ NetView.prototype.save = function() {
 
     // add a placeholder for the data length
     write(0);
-
     write(SERIALIZATION_VERSION);
+    // place holder for base data length
+    write(0);
+
     write(this.cells.length);
     write(this.fibers.length);
+    write(this.labels.length);
 
     for (i = 0; i < this.cells.length; ++i) {
         var cell = this.cells[i];
@@ -509,14 +512,26 @@ NetView.prototype.save = function() {
         write(fiber.to.index);
     }
 
+    for (i = 0; i < this.labels.length; ++i) {
+        var label = this.labels[i];
+        write(label.pos.x);
+        write(label.pos.y);
+        write(label.text.length);
+    }
+
+    var labelText = this.labels.map(function(l) {
+        return l.text;
+    }).join('');
+
     // prefix the data with the number of bytes so that load can detect malformed data
-    d[0] = d.length * 2;
+    d[2] = labelText.length; 
+    d[0] = d.length * 2 + d[2]; 
 
     var arr16 = new Uint16Array(d);
     var arr8 = new Uint8Array(arr16.buffer);
     var str = String.fromCharCode.apply(null, arr8);
 
-    return btoa(str);
+    return btoa(str + labelText);
 };
 
 NetView.prototype.load = function(base64) {
@@ -524,6 +539,7 @@ NetView.prototype.load = function(base64) {
     var i, j;
     var cell;
     var fiber;
+    var label;
 
     try {
         str = atob(base64);
@@ -548,7 +564,8 @@ NetView.prototype.load = function(base64) {
         return SERIALIZATION_INVALID_LENGTH;
     }
 
-    if (read() !== SERIALIZATION_VERSION) {
+    var version = read();
+    if ([1, 2].indexOf(version) === -1) {
         return SERIALIZATION_INVALID_VERSION;
     }
 
@@ -561,6 +578,13 @@ NetView.prototype.load = function(base64) {
 
     for (i = 0; i < this.fibers.length; ++i) {
         this.fibers[i] = new FiberView(i);
+    }
+
+    if (version > 1) {
+        this.labels = new Array(read());
+        for (i = 0; i < this.labels.length; ++i) {
+            this.labels[i] = new LabelView(i);
+        }
     }
 
     for (i = 0; i < this.cells.length; ++i) {
@@ -585,9 +609,26 @@ NetView.prototype.load = function(base64) {
 
     for (i = 0; i < this.fibers.length; ++i) {
         fiber = this.fibers[i];
-
         fiber.from = this.cells[read()];
         fiber.to = this.cells[read()];
+    }
+
+    if (version > 1) {
+        var textLengths = [];
+        for (i = 0; i < this.labels.length; ++i) {
+            label = this.labels[i];
+            label.pos.x = read();
+            label.pos.y = read();
+            textLengths.push(read());
+        }
+
+        var end = str.length;
+        var start;
+        for (i = 0; i < textLengths.length; ++i) {
+            start = end - textLengths[i];
+            this.labels[i].text = str.substring(start, end);
+            end = start;
+        }
     }
 
     return SERIALIZATION_SUCCESS;
