@@ -236,18 +236,21 @@ function LabelView(i) {
     Label.call(this, i);
     this.pos = new Vec(0,0);
 }
+LabelView.prototype.bounds = function(fontsize) {
+    var width = this.text.length * fontsize;
+    var height = fontsize;
+    var pad = 2;
+
+   return {
+       min: new Vec(this.pos.x - width / 2.0 - pad, this.pos.y - height / 2.0 - pad),
+       max: new Vec(this.pos.x + width / 2.0 + pad, this.pos.y + height / 2.0 + pad)
+   }
+};
 
 LabelView.prototype.hits = function(mousePos, fontsize) {
-    var width = this.text.length * fontsize * 2.0;
-    var height = fontsize * 2.0;
-    var pad = 3;
-
-    var min = new Vec(this.pos.x - width / 2.0 - pad, this.pos.y - height / 2.0 - pad);
-    var max = new Vec(this.pos.x + width / 2.0 + pad, this.pos.y + height / 2.0 + pad);
-
-    return mousePos.inBounds(min, max);
+    var bounds = this.bounds(fontsize);
+    return mousePos.inBounds(bounds.min, bounds.max);
 }
-
 
 function FiberView(i) {
     Fiber.call(this, i);
@@ -749,8 +752,10 @@ CreateTool.prototype.cancel = function() {
 
 function EditTextTool(sim, text, callback) {
     this.input = EditTextTool.createTextInputElement(sim);
-    this.input.focus();
     this.input.value = text;
+
+    this.input.focus();
+    this.input.select();
 
     this.input.addEventListener("keyup", (function(e) {
         if (e.key === 'Enter' || e.key === 'Return') {
@@ -955,7 +960,7 @@ function getMousePos(canvas, e) {
     return new Vec(e.clientX - rect.left, e.clientY - rect.top);
 }
 
-var DefaultNet = 'oAABAAYACAAnAfYAAAAAAAEABQABAAMAAAABAAYAkQGSAAEAAAABAAAAAAABAAIAkQHGAAEAAAABAAEAAAABAAMA9wHtAAMAAAADAAIAAAADAAAABwAAAAEABAAUAUUBAQABAAEABAAAAAEABQCTAQYBAQAAAAEABgAAAAEABwAAAAEAAAACAAEAAwACAAMAAwAEAAQAAAAAAAUABQADAA==';
+var DefaultNet = "FgICAAgACAAFAFoB7AAAAAAAAQAFAAEAAwAAAAEABgDiAYMAAQAAAAEAAAAAAAEAAgDiAbcAAQAAAAEAAQAAAAEAAwBIAt4AAwAAAAMAAgAAAAMAAAAHAAAAAQAEADgBSgEBAAEAAQAEAAAAAQAFAOQB9wABAAAAAQAGAAAAAQAHALwBHAIAAAAAAAAAAFcCBwIBAAAAAAAAAAAAAQAAAAIAAQADAAIAAwADAAQABAAAAAAABQAFAAMA3AFBACAAywCtACEAxwDgAA4AaAF9ASsABgLOASUAUwBlAGwAZQBjAHQAIABjAGUAbABsAHMAIAB3AGkAdABoACAAdABoAGUAIABsAGUAZgB0ACAAbQBvAHUAcwBlAEMAaABhAG4AZwBlACAAdABoAHIAZQBzAGgAbwBsAGQAIAB3AGkAdABoACAAbgB1AG0AYgBlAHIAIABrAGUAeQBzADAAIABhAGwAdwBhAHkAcwAgAGYAaQByAGUAcwBSAGkAZwBoAHQAIABjAGwAaQBjAGsAIABvAG4AIABmAGkAYgBlAHIAcwAgAGEAbgBkACAAYwBlAGwAbABzACAAZgBvAHIAIABvAHAAdABpAG8AbgBzAEMAbABpAGMAawAgAGEAbgBkACAAZAByAGEAZwAgAGYAaQBiAGUAcgBzACAAYgBlAHQAdwBlAGUAbgAgAG4AZQB1AHIAbwBuAHMA";
 
 function Sim() {
     this.selection = [];
@@ -1257,7 +1262,7 @@ function drawSim(ctx, canvas, sim) {
     clearCanvas(ctx, canvas);
 
     drawFibers(ctx, sim.net);
-    drawCells(ctx, sim.net);
+    drawCells(ctx, sim.net, sim.fontsize);
 
     if (sim.tool) {
         if (sim.tool instanceof FiberTool) {
@@ -1268,7 +1273,7 @@ function drawSim(ctx, canvas, sim) {
     }
 
     drawHoverRing(ctx, sim.net, sim.mousePos);
-    drawTextLabels(ctx, sim.net, sim.fontsize);
+    drawTextLabels(ctx, sim.net, sim.selection, sim.fontsize);
 }
 
 function clearCanvas(ctx, canvas) {
@@ -1319,21 +1324,45 @@ function drawSelectBox(ctx, selectTool, mousePos) {
     ctx.setLineDash([]);
 }
 
-function drawTextLabels(ctx, net, fontsize){
+function drawTextLabels(ctx, net, selection, fontsize){
     ctx.font =  fontsize.toString() + 'pt monospace';
-    ctx.fillStyle = '#000000';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+
+    var marked = {};
+
+    for (i = 0; i < selection.length; ++i) {
+        if (selection[i] instanceof LabelView) {
+            marked[selection[i].index] = true;
+        }
+    }
+
+
+
+    /*
+        var bounds = sel[i].bounds(fontsize);
+
+        ctx.beginPath();
+        ctx.moveTo(bounds.min.x, bounds.max.y);
+        ctx.lineTo(bounds.max.x, bounds.max.y);
+        ctx.stroke();
+        */
 
     var label;
     var i;
     for (i = 0; i < net.labels.length; i++){
         label = net.labels[i];
+
+        if (marked[i]) {
+            ctx.fillStyle = '#009900';
+        } else {
+            ctx.fillStyle = '#000000';
+        }
         ctx.fillText(net.labels[i].text, label.pos.x, label.pos.y);
     }
 }
 
-function drawCells(ctx, net) {
+function drawCells(ctx, net, labelFontSize) {
     // draw the front of the cells
     // quite
     ctx.fillStyle = '#444444';
@@ -1354,7 +1383,7 @@ function drawCells(ctx, net) {
 
     // draw the selected cells
     ctx.strokeStyle = '#009900';
-    drawSelection(ctx, net, gSim.selection);
+    drawCellSelection(ctx, net, gSim.selection, labelFontSize);
 
     // draw the text
     drawCellLabels(ctx, net);
@@ -1437,7 +1466,8 @@ function drawCellArrows(ctx, net) {
     }
 }
 
-function drawSelection(ctx, net, sel) {
+
+function drawCellSelection(ctx, net, sel, fontsize) {
     var i;
     var cell;
 
@@ -1449,7 +1479,7 @@ function drawSelection(ctx, net, sel) {
             ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 2.0, 0.0, false);
             ctx.stroke();
         }
-   }
+    }
     ctx.lineWidth = 1;
 }
 
