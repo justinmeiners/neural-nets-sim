@@ -222,15 +222,21 @@ CellView.prototype = Object.create(Cell.prototype);
 CellView.prototype.constructor = CellView;
 
 CellView.prototype.radius = CellView.radius;
-CellView.prototype.connectorPadding = 12.0;
+CellView.prototype.connectorPadding = 11.0;
 
 CellView.prototype.hits = function(p) {
     return p.inCircle(this.pos, this.radius);
 };
 
 CellView.prototype.hitsConnectors = function(p) {
-    return p.inCircle(this.pos, this.radius + this.connectorPadding);
+    var OUTSIDE_PADDING = 6;
+    return p.inCircle(this.pos, this.radius + this.connectorPadding + OUTSIDE_PADDING);
 };
+
+CellView.prototype.isPositionOnOutputSide = function(mousePos) {
+    var dir = Vec.sub(mousePos, this.pos);
+    return Vec.dot(dir, Vec.fromAngle(this.angle)) > 0.0;
+}
 
 function LabelView(i) {
     Label.call(this, i);
@@ -908,7 +914,7 @@ function FiberTool(sim, e, cell) {
 
     var dir = Vec.sub(this.sim.mousePos, cell.pos);
  
-    if (Vec.dot(dir, Vec.fromAngle(cell.angle))  > 0.0) {
+    if (cell.isPositionOnOutputSide(this.sim.mousePos)) {
         this.from = cell;
     } else {
         this.to = cell;
@@ -1264,15 +1270,20 @@ function drawSim(ctx, canvas, sim) {
     drawFibers(ctx, sim.net);
     drawCells(ctx, sim.net, sim.fontsize);
 
+    var drawingFiberToInput = false;
+    var drawingFiberToOutput = false;
+
     if (sim.tool) {
         if (sim.tool instanceof FiberTool) {
             drawPartialFiber(ctx, sim.tool, sim.mousePos);
+            drawingFiberToInput = !!sim.tool.from;
+            drawingFiberToOutput = !!sim.tool.to;
         } else if (gSim.tool instanceof SelectTool) {
             drawSelectBox(ctx, sim.tool, sim.mousePos);
         }
     }
 
-    drawHoverRing(ctx, sim.net, sim.mousePos);
+    drawHoverRing(ctx, sim.net, sim.mousePos, drawingFiberToInput, drawingFiberToOutput);
     drawTextLabels(ctx, sim.net, sim.selection, sim.fontsize);
 }
 
@@ -1284,24 +1295,52 @@ function clearCanvas(ctx, canvas) {
     return ctx.fill();
 }
 
-function drawHoverRing(ctx, net, mousePos) {
+function drawHoverRing(ctx, net, mousePos, drawingFiberToInput, drawingFiberToOutput) {
+    var INACTIVE_COLOR = '#B0B0B0';
+    var HIGHLIGHT_COLOR = '#0000FF';
+    
     var i;
     var cell;
+    var highlightInput;
+    var highlightOutput;
     var radius;
+    var angleOffset;
+
     for (i = 0; i < net.cells.length; ++i) {
         cell = net.cells[i];
-        if (cell.hitsConnectors(mousePos) &&
-            !cell.hits(mousePos)) {
+
+        if (cell.hitsConnectors(mousePos)) {
+            // If the user is using the fiber tool to create a new fiber, we
+            // want to highlight the portion of the hover ring that the user can
+            // connect the fiber to. Otherwise, we want highlight the portion
+            // of the hover ring that the user is hovering over.
+            if (drawingFiberToInput || drawingFiberToOutput) {
+                highlightOutput = drawingFiberToOutput;
+                highlightInput = drawingFiberToInput;
+            } else if (cell.hits(mousePos)) {
+                highlightOutput = false;
+                highlightInput = false;
+            } else {
+                highlightOutput = cell.isPositionOnOutputSide(mousePos);
+                highlightInput = !highlightOutput;
+            }
 
             radius = cell.radius + cell.connectorPadding;
-            ctx.strokeStyle = '#0000FF';
             ctx.lineWidth = 1;
             ctx.setLineDash([4]);
 
-            ctx.beginPath();
-            ctx.arc(cell.pos.x, cell.pos.y, radius, 0.0, Math.PI * 2.0, false);
+            angleOffset = cell.angle !== ANGLE_EAST ? 0 : Math.PI * 1;
 
+            ctx.beginPath();
+            ctx.strokeStyle = highlightOutput ? HIGHLIGHT_COLOR : INACTIVE_COLOR;
+            ctx.arc(cell.pos.x, cell.pos.y, radius, Math.PI * 0.5 + angleOffset, Math.PI * 1.5 + angleOffset, false);
             ctx.stroke();
+
+            ctx.beginPath();
+            ctx.strokeStyle = highlightInput ? HIGHLIGHT_COLOR : INACTIVE_COLOR;
+            ctx.arc(cell.pos.x, cell.pos.y, radius, Math.PI * -0.5 + angleOffset, Math.PI * -1.5 + angleOffset, false);
+            ctx.stroke();
+
             ctx.lineWidth = 1;
             ctx.setLineDash([]);
         }
