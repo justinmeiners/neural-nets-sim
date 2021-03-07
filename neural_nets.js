@@ -239,12 +239,13 @@ LabelView.radius = 25.0;
 
 LabelView.prototype.hits = function(mousePos, fontsize) {
     var halflen = this.text.length/2.0;
+    var buffer = 3.0;
     var min= new Vec(this.pos.x, this.pos.y);
     var max = new Vec(this.pos.x, this.pos.y);
-    min.x -= halflen*fontsize + 3;
-    min.y -= (fontsize/2.0) + 3;
-    max.x += halflen*fontsize + 3;
-    max.y += (fontsize/2.0) + 3;
+    min.x -= halflen*fontsize + buffer;
+    min.y -= (fontsize/2.0) + (buffer * 2);
+    max.x += halflen*fontsize + buffer;
+    max.y += (fontsize/2.0) + (buffer*2);
     return mousePos.inBounds(min, max);
 }
 
