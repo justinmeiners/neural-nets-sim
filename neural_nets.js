@@ -229,7 +229,8 @@ CellView.prototype.hits = function(p) {
 };
 
 CellView.prototype.hitsConnectors = function(p) {
-    return p.inCircle(this.pos, this.radius + this.connectorPadding * 1.5);
+    var OUTSIDE_PADDING = 6;
+    return p.inCircle(this.pos, this.radius + this.connectorPadding + OUTSIDE_PADDING);
 };
 
 CellView.prototype.isPositionOnOutputSide = function(mousePos) {
