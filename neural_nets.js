@@ -16,6 +16,10 @@ function Cell(i) {
     this.threshold = 1;
 }
 
+function Label() {
+    this.text = "";
+}
+
 function Fiber(i) {
     this.index = i;
     this.from = null;
@@ -32,6 +36,7 @@ function Net() {
     this.cells = [];
     this.fibers = [];
     this.branches = [];
+    this.labels = [];
 }
 
 function visitFibers(fiber, f) {
@@ -225,6 +230,24 @@ CellView.prototype.hitsConnectors = function(p) {
     return p.inCircle(this.pos, this.radius + this.connectorPadding);
 };
 
+function LabelView() {
+    Label.call(this);
+    this.pos = new Vec(0,0);
+}
+
+LabelView.radius = 25.0;
+
+LabelView.prototype.hits = function(mousePos, fontsize) {
+    var halflen = this.text.length/2.0;
+    var min= new Vec(this.pos.x, this.pos.y);
+    var max = new Vec(this.pos.x, this.pos.y);
+    min.x -= halflen*fontsize + 3;
+    min.y -= (fontsize/2.0) + 3;
+    max.x += halflen*fontsize + 3;
+    max.y += (fontsize/2.0) + 3;
+    return mousePos.inBounds(min, max);
+}
+
 
 function FiberView(i) {
     Fiber.call(this, i);
@@ -357,6 +380,12 @@ NetView.prototype.restart = function() {
     this.signals = [];
     this.time = 0;
 };
+
+NetView.prototype.addTextLabel = function() {
+    var label = new LabelView();
+    this.labels.push(label);
+    return label;
+}
 
 
 NetView.prototype.addCell = function() {
@@ -647,11 +676,17 @@ function CreateTool(sim, e) {
             } else if (action === 'new-branch') {
                 added = sim.net.addBranch();
                 added.pos = canvasLoc;
+            } else if (action == 'new-textLabel') {
+                added = sim.net.addTextLabel();
+                EditLabelTool.editLabel(sim, added, canvasLoc);
+                
             }
 
             menu.classList.remove('active');
         }
     };
+
+    
 }
 
 CreateTool.prototype.mouseUp = function(e) {
@@ -661,6 +696,65 @@ CreateTool.prototype.mouseUp = function(e) {
 CreateTool.prototype.cancel = function() {
     this.menu.classList.remove('active');
 };
+
+function EditLabelTool(sim, e, obj){
+    var menu = document.getElementById('edit-label-menu');
+
+    this.label = obj;
+
+    this.menu = menu;
+    this.menu.style.left = e.pageX + 'px';
+    this.menu.style.top = e.pageY + 'px';
+    this.menu.classList.add('active');
+
+    this.menu.onclick = function(e) {
+        var action;
+        if(e.target.matches('li')){
+            action = e.target.getAttribute('data-action');
+
+            if(action === 'edit'){
+                EditLabelTool.editLabel(sim,label,null);
+            }
+        }
+        menu.classList.remove('active');
+    }
+
+}
+
+EditLabelTool.prototype.mouseUp = function(e) {
+    this.cancel();
+};
+
+EditLabelTool.prototype.cancel = function() {
+    this.menu.classList.remove('active');
+};
+
+
+EditLabelTool.createTextInputElement = function(sim){
+        var textInput = document.createElement("INPUT");
+        textInput.setAttribute("type", "text");
+        textInput.style.position = "absolute";
+        var rect = sim.canvas.getBoundingClientRect();
+        textInput.style.top = sim.mousePos.y+ rect.top + "px";
+        textInput.style.left = sim.mousePos.x + rect.left + "px";
+        document.body.appendChild(textInput);
+        return textInput;
+};
+
+
+EditLabelTool.editLabel = function(sim, toEdit, newLoc) {
+    var input = EditLabelTool.createTextInputElement(sim);
+    input.focus();
+    input.addEventListener("focusout", function(){
+        toEdit.text = input.value;
+        if(newLoc){
+            toEdit.pos = newLoc;
+        }
+        input.remove();
+    });
+};
+
+
 
 function EditCellTool(sim, e, obj) {
     var menu = document.getElementById('edit-menu');
@@ -794,6 +888,8 @@ FiberTool.prototype.mouseUp = function(e) {
     this.to.inputTypes.push(INPUT_EXCITE);
 };
 
+
+
 // WINDOW AND CONTEXT
 // -------------------------
 
@@ -809,6 +905,7 @@ function Sim() {
     this.play = true;
 
     this.mousePos = new Vec(0, 0);
+    this.fontsize = 14.0;
 
     this.playBtn = document.getElementById('play-btn');
     this.playBtn.onclick = this.togglePlay.bind(this);
@@ -889,8 +986,15 @@ function Sim() {
             return cell.hits(mousePos);
         });
 
+        var fontsize = this.fontsize;
+        var labelHit = this.net.labels.find(function (label) {
+            return label.hits(mousePos, fontsize);
+        });
+
         if (hit) {
             this.tool = new EditCellTool(this, e, hit);
+        }else if(labelHit){
+            this.tool = new EditLabelTool(this, e, labelHit);
         } else {
             hit = this.net.fibers.find(function (fiber) {
                 return fiber.hits(mousePos);
@@ -1004,6 +1108,11 @@ Sim.prototype.mouseDown = function(e) {
     var connectHit = this.net.cells.find(function (cell) {
         return cell.hitsConnectors(mousePos);
     });
+    
+    var fontSize = this.fontsize;
+    var labelHit = this.net.labels.find(function (label) {
+        return label.hits(mousePos,fontSize);
+    });
 
     if (hit) {
         var index = this.selection.indexOf(hit);
@@ -1013,6 +1122,15 @@ Sim.prototype.mouseDown = function(e) {
         }
 
         this.tool = new MoveTool(this, e);
+    } else if (labelHit) { 
+        var index = this.selection.indexOf(labelHit);
+
+        if (index === -1) {
+            this.selection = [labelHit];
+        }
+
+        this.tool = new MoveTool(this, e);
+        
     } else if (connectHit) {
         this.tool = new FiberTool(this, e, connectHit);
     } else {
@@ -1070,6 +1188,7 @@ function drawSim(ctx, canvas, sim) {
     }
 
     drawHoverRing(ctx, sim.net, sim.mousePos);
+    drawTextLabels(ctx, sim.net, sim.fontsize);
 }
 
 function clearCanvas(ctx, canvas) {
@@ -1118,6 +1237,15 @@ function drawSelectBox(ctx, selectTool, mousePos) {
     ctx.stroke();
 
     ctx.setLineDash([]);
+}
+
+function drawTextLabels(ctx, net, fontsize){
+    ctx.font =  fontsize + 'pt monospace';
+    ctx.fillStyle = '#000000';
+    for(var i = 0; i < net.labels.length; i++){
+        label = net.labels[i];
+        ctx.fillText(net.labels[i].text, label.pos.x, label.pos.y);
+    }
 }
 
 function drawCells(ctx, net) {
