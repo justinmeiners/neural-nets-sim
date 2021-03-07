@@ -1,3 +1,4 @@
+"use strict";
 // Created by Justin Meiners
 // LICENSE GPL v3.0
 // https://raw.githubusercontent.com/justinmeiners/neural-nets-sim/master/LICENSE
@@ -16,8 +17,9 @@ function Cell(i) {
     this.threshold = 1;
 }
 
-function Label() {
+function Label(i) {
     this.text = "";
+    this.index = i;
 }
 
 function Fiber(i) {
@@ -230,21 +232,19 @@ CellView.prototype.hitsConnectors = function(p) {
     return p.inCircle(this.pos, this.radius + this.connectorPadding);
 };
 
-function LabelView() {
-    Label.call(this);
+function LabelView(i) {
+    Label.call(this, i);
     this.pos = new Vec(0,0);
 }
 
-LabelView.radius = 25.0;
-
 LabelView.prototype.hits = function(mousePos, fontsize) {
-    var halflen = this.text.length/2.0;
-    var min= new Vec(this.pos.x, this.pos.y);
-    var max = new Vec(this.pos.x, this.pos.y);
-    min.x -= halflen*fontsize + 3;
-    min.y -= (fontsize/2.0) + 3;
-    max.x += halflen*fontsize + 3;
-    max.y += (fontsize/2.0) + 3;
+    var width = this.text.length * fontsize * 2.0;
+    var height = fontsize * 2.0;
+    var pad = 3;
+
+    var min = new Vec(this.pos.x - width / 2.0 - pad, this.pos.y - height / 2.0 - pad);
+    var max = new Vec(this.pos.x + width / 2.0 + pad, this.pos.y + height / 2.0 + pad);
+
     return mousePos.inBounds(min, max);
 }
 
@@ -382,10 +382,18 @@ NetView.prototype.restart = function() {
 };
 
 NetView.prototype.addTextLabel = function() {
-    var label = new LabelView();
+    var label = new LabelView(this.labels.length);
     this.labels.push(label);
     return label;
-}
+};
+
+NetView.prototype.removeLabel = function(toDelete) {
+    var last = this.labels.pop();
+    if (last !== toDelete) {
+        this.labels[toDelete.index] = last;
+        last.index = toDelete.index;
+    }
+};
 
 
 NetView.prototype.addCell = function() {
@@ -616,8 +624,10 @@ SelectTool.prototype.mouseUp = function(e) {
     var min = Vec.min(this.dragInitial, this.sim.mousePos);
     var max = Vec.max(this.dragInitial, this.sim.mousePos);
 
-    this.sim.selection = this.sim.net.cells.filter(function (cell) {
-        return cell.pos.inBounds(min, max);
+    var all = this.sim.net.cells.concat(this.sim.net.labels);
+
+    this.sim.selection = all.filter(function (obj) {
+        return obj.pos.inBounds(min, max);
     });
 };
 
@@ -676,17 +686,14 @@ function CreateTool(sim, e) {
             } else if (action === 'new-branch') {
                 added = sim.net.addBranch();
                 added.pos = canvasLoc;
-            } else if (action == 'new-textLabel') {
+            } else if (action == 'new-label') {
                 added = sim.net.addTextLabel();
-                EditLabelTool.editLabel(sim, added, canvasLoc);
-                
+                added.pos = canvasLoc;
+                sim.editLabelText(added);
             }
-
             menu.classList.remove('active');
         }
     };
-
-    
 }
 
 CreateTool.prototype.mouseUp = function(e) {
@@ -697,10 +704,40 @@ CreateTool.prototype.cancel = function() {
     this.menu.classList.remove('active');
 };
 
-function EditLabelTool(sim, e, obj){
-    var menu = document.getElementById('edit-label-menu');
+function EditTextTool(sim, text, callback) {
+    this.input = EditTextTool.createTextInputElement(sim);
+    this.input.focus();
+    this.input.value = text;
 
-    this.label = obj;
+    this.input.addEventListener("keyup", (function(e) {
+        if (e.key === 'Enter' || e.key === 'Return') {
+            this.input.blur();
+            callback(e.target.value);
+        } else if (e.key == 'Escape') {
+            this.input.blur();
+        }
+    }).bind(this));
+
+    this.input.addEventListener("focusout", this.cancel.bind(this));
+}
+
+EditTextTool.prototype.cancel = function() {
+    this.input.remove();
+};
+
+EditTextTool.createTextInputElement = function(sim){
+    var dom = document.createElement("INPUT");
+    dom.setAttribute("type", "text");
+    dom.style.position = "absolute";
+    var rect = sim.canvas.getBoundingClientRect();
+    dom.style.top = (sim.mousePos.y + rect.top).toString() + "px";
+    dom.style.left = (sim.mousePos.x + rect.left).toString() + "px";
+    document.body.appendChild(dom);
+    return dom;
+};
+
+function EditLabelTool(sim, e, label){
+    var menu = document.getElementById('label-menu');
 
     this.menu = menu;
     this.menu.style.left = e.pageX + 'px';
@@ -712,13 +749,16 @@ function EditLabelTool(sim, e, obj){
         if(e.target.matches('li')){
             action = e.target.getAttribute('data-action');
 
-            if(action === 'edit'){
-                EditLabelTool.editLabel(sim,label,null);
+            if (action === 'edit'){
+                sim.editLabelText(label);
+            } else if (action === 'delete') {
+                sim.net.removeLabel(label);
             }
         }
         menu.classList.remove('active');
     }
 
+    this.input = null;
 }
 
 EditLabelTool.prototype.mouseUp = function(e) {
@@ -727,37 +767,11 @@ EditLabelTool.prototype.mouseUp = function(e) {
 
 EditLabelTool.prototype.cancel = function() {
     this.menu.classList.remove('active');
+
 };
-
-
-EditLabelTool.createTextInputElement = function(sim){
-        var textInput = document.createElement("INPUT");
-        textInput.setAttribute("type", "text");
-        textInput.style.position = "absolute";
-        var rect = sim.canvas.getBoundingClientRect();
-        textInput.style.top = sim.mousePos.y+ rect.top + "px";
-        textInput.style.left = sim.mousePos.x + rect.left + "px";
-        document.body.appendChild(textInput);
-        return textInput;
-};
-
-
-EditLabelTool.editLabel = function(sim, toEdit, newLoc) {
-    var input = EditLabelTool.createTextInputElement(sim);
-    input.focus();
-    input.addEventListener("focusout", function(){
-        toEdit.text = input.value;
-        if(newLoc){
-            toEdit.pos = newLoc;
-        }
-        input.remove();
-    });
-};
-
-
 
 function EditCellTool(sim, e, obj) {
-    var menu = document.getElementById('edit-menu');
+    var menu = document.getElementById('cell-menu');
 
     this.obj = obj;
 
@@ -953,8 +967,10 @@ function Sim() {
             // numbers for threshold
             num = parseInt(e.key);
 
-            this.selection.forEach(function(c) {
-                c.threshold = num;
+            this.selection.forEach(function(obj) {
+                if (obj instanceof CellView) {
+                    obj.threshold = num;
+                }
             });
 
             e.preventDefault();
@@ -986,23 +1002,25 @@ function Sim() {
             return cell.hits(mousePos);
         });
 
-        var fontsize = this.fontsize;
-        var labelHit = this.net.labels.find(function (label) {
-            return label.hits(mousePos, fontsize);
-        });
-
         if (hit) {
             this.tool = new EditCellTool(this, e, hit);
-        }else if(labelHit){
-            this.tool = new EditLabelTool(this, e, labelHit);
         } else {
-            hit = this.net.fibers.find(function (fiber) {
-                return fiber.hits(mousePos);
+            var fontsize = this.fontsize;
+            hit = this.net.labels.find(function (label) {
+                return label.hits(mousePos, fontsize);
             });
+
             if (hit) {
-                this.tool = new EditFiberTool(this, e, hit);
+                this.tool = new EditLabelTool(this, e, hit);
             } else {
-                this.tool = new CreateTool(this, e, hit);
+                hit = this.net.fibers.find(function (fiber) {
+                    return fiber.hits(mousePos);
+                });
+                if (hit) {
+                    this.tool = new EditFiberTool(this, e, hit);
+                } else {
+                    this.tool = new CreateTool(this, e, hit);
+                }
             }
         }
     }).bind(this);
@@ -1020,7 +1038,7 @@ function Sim() {
     } else {
         this.net.load(DefaultNet);
     }
-}
+};
 
 Sim.prototype.togglePlay = function() {
     this.play = !this.play;
@@ -1050,7 +1068,7 @@ Sim.prototype.download = function(url) {
     req.onload = (function() {
         var ret;
 
-        if (req.status === 200) {
+        if ( req.status >= 200 && req.status < 300) {
             ret = this.net.load(req.responseText.trim());
 
             if (ret !== SERIALIZATION_SUCCESS) {
@@ -1079,8 +1097,12 @@ Sim.prototype.save = function() {
 
 Sim.prototype.deleteSelection = function() {
     var net = this.net;
-    this.selection.forEach(function(c) {
-        net.removeCell(c);
+    this.selection.forEach(function(obj) {
+        if (obj instanceof CellView) {
+            net.removeCell(obj);
+        } else if (obj instanceof LabelView) {
+            net.removeLabel(obj);
+        }
     });
 
     // clear selection
@@ -1136,6 +1158,21 @@ Sim.prototype.mouseDown = function(e) {
     } else {
         this.tool = new SelectTool(this, e);
     }
+};
+
+Sim.prototype.editLabelText = function(label) {
+    if (this.tool && this.tool.cancel) {
+        this.tool.cancel();
+        delete this.tool;
+    }
+    var net = this.net;
+    this.tool = new EditTextTool(this, label.text, function(val) {
+        if (!val) {
+            net.removeLabel(label);
+        } else {
+            label.text = val;
+        }
+    });
 };
 
 Sim.prototype.mouseMove = function(e) {
@@ -1240,9 +1277,14 @@ function drawSelectBox(ctx, selectTool, mousePos) {
 }
 
 function drawTextLabels(ctx, net, fontsize){
-    ctx.font =  fontsize + 'pt monospace';
+    ctx.font =  fontsize.toString() + 'pt monospace';
     ctx.fillStyle = '#000000';
-    for(var i = 0; i < net.labels.length; i++){
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    var label;
+    var i;
+    for (i = 0; i < net.labels.length; i++){
         label = net.labels[i];
         ctx.fillText(net.labels[i].text, label.pos.x, label.pos.y);
     }
@@ -1358,11 +1400,13 @@ function drawSelection(ctx, net, sel) {
 
     ctx.lineWidth = 2;
     for (i = 0; i < sel.length; ++i) {
-        cell = sel[i];
-        ctx.beginPath();
-        ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 2.0, 0.0, false);
-        ctx.stroke();
-    }
+        if (sel[i] instanceof CellView) {
+            cell = sel[i];
+            ctx.beginPath();
+            ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 2.0, 0.0, false);
+            ctx.stroke();
+        }
+   }
     ctx.lineWidth = 1;
 }
 
