@@ -478,8 +478,6 @@ NetView.prototype.save = function() {
     // add a placeholder for the data length
     write(0);
     write(SERIALIZATION_VERSION);
-    // place holder for base data length
-    write(0);
 
     write(this.cells.length);
     write(this.fibers.length);
@@ -523,9 +521,14 @@ NetView.prototype.save = function() {
         return l.text;
     }).join('');
 
+    // Uint16 array needs even length.
+    // sorry... we added this later
+    if (labelText.length % 2 === 1) {
+        labelText += '_';
+    }
+
     // prefix the data with the number of bytes so that load can detect malformed data
-    d[2] = labelText.length; 
-    d[0] = d.length * 2 + d[2]; 
+    d[0] = d.length * 2 + labelText.length; 
 
     var arr16 = new Uint16Array(d);
     var arr8 = new Uint8Array(arr16.buffer);
@@ -554,10 +557,12 @@ NetView.prototype.load = function(base64) {
     }
 
     var d = new Uint16Array(arr8.buffer);
-    var cursor = -1;
+    var cursor = 0;
 
     function read() {
-        return d[++cursor];
+        var x = d[cursor];
+        ++cursor;
+        return x;
     }
 
     if (read() !== d.length * 2) {
@@ -622,12 +627,16 @@ NetView.prototype.load = function(base64) {
             textLengths.push(read());
         }
 
-        var end = str.length;
-        var start;
+        var start = cursor * 2;
+        var end;
         for (i = 0; i < textLengths.length; ++i) {
-            start = end - textLengths[i];
+            end = start + textLengths[i];
             this.labels[i].text = str.substring(start, end);
-            end = start;
+            start = end;
+        }
+
+        if (str.length - end > 1) {
+            return SERIALIZATION_INVALID_LENGTH;
         }
     }
 
