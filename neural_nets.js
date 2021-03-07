@@ -1269,17 +1269,20 @@ function drawSim(ctx, canvas, sim) {
     drawFibers(ctx, sim.net);
     drawCells(ctx, sim.net, sim.fontsize);
 
+    var drawingFiberToInput = false;
+    var drawingFiberToOutput = false;
+
     if (sim.tool) {
         if (sim.tool instanceof FiberTool) {
             drawPartialFiber(ctx, sim.tool, sim.mousePos);
-            drawHoverRing(ctx, sim.net, sim.mousePos, !!sim.tool.from, !!sim.tool.to);
+            drawingFiberToInput = !!sim.tool.from;
+            drawingFiberToOutput = !!sim.tool.to;
         } else if (gSim.tool instanceof SelectTool) {
             drawSelectBox(ctx, sim.tool, sim.mousePos);
         }
-    } else {
-        drawHoverRing(ctx, sim.net, sim.mousePos, false, false);
     }
 
+    drawHoverRing(ctx, sim.net, sim.mousePos, drawingFiberToInput, drawingFiberToOutput);
     drawTextLabels(ctx, sim.net, sim.selection, sim.fontsize);
 }
 
