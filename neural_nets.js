@@ -559,6 +559,12 @@ NetView.prototype.load = function(base64) {
         return d[++cursor];
     }
 
+    function readBlock(length) {
+        var x = d.slice(cursor + 1, cursor + 1 + length);
+        cursor += length;
+        return x;
+    }
+
     if (read() !== d.length * 2) {
         return SERIALIZATION_INVALID_LENGTH;
     }
@@ -622,10 +628,7 @@ NetView.prototype.load = function(base64) {
         }
 
         for (i = 0; i < textLengths.length; ++i) {
-            var characters = [];
-            for (j = 0; j < textLengths[i]; ++j) {
-                characters.push(read());
-            }
+            var characters = readBlock(textLengths[i]);
             this.labels[i].text = String.fromCharCode.apply(null, characters);
         }
     }
