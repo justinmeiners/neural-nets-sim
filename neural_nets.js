@@ -517,24 +517,20 @@ NetView.prototype.save = function() {
         write(label.text.length);
     }
 
-    var labelText = this.labels.map(function(l) {
-        return l.text;
-    }).join('');
-
-    // Uint16 array needs even length.
-    // sorry... we added this later
-    if (labelText.length % 2 === 1) {
-        labelText += '_';
-    }
+    this.labels.forEach(function(l) {
+        for (i = 0; i < l.text.length; ++i) {
+            write(l.text.charCodeAt(i));
+        }
+    });
 
     // prefix the data with the number of bytes so that load can detect malformed data
-    d[0] = d.length * 2 + labelText.length; 
+    d[0] = d.length * 2; 
 
     var arr16 = new Uint16Array(d);
     var arr8 = new Uint8Array(arr16.buffer);
     var str = String.fromCharCode.apply(null, arr8);
 
-    return btoa(str + labelText);
+    return btoa(str);
 };
 
 NetView.prototype.load = function(base64) {
@@ -557,12 +553,10 @@ NetView.prototype.load = function(base64) {
     }
 
     var d = new Uint16Array(arr8.buffer);
-    var cursor = 0;
+    var cursor = -1;
 
     function read() {
-        var x = d[cursor];
-        ++cursor;
-        return x;
+        return d[++cursor];
     }
 
     if (read() !== d.length * 2) {
@@ -627,16 +621,12 @@ NetView.prototype.load = function(base64) {
             textLengths.push(read());
         }
 
-        var start = cursor * 2;
-        var end;
         for (i = 0; i < textLengths.length; ++i) {
-            end = start + textLengths[i];
-            this.labels[i].text = str.substring(start, end);
-            start = end;
-        }
-
-        if (str.length - end > 1) {
-            return SERIALIZATION_INVALID_LENGTH;
+            var characters = [];
+            for (j = 0; j < textLengths[i]; ++j) {
+                characters.push(read());
+            }
+            this.labels[i].text = String.fromCharCode.apply(null, characters);
         }
     }
 
