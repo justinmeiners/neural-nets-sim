@@ -79,20 +79,21 @@
             <div id='new-menu' class="context-menu"> 
                 <ul>
                     <li data-action="new-cell">New Neuron</li>
-                    <li data-action="new-textLabel">New Label</li>
+                    <li data-action="new-label">New Label</li>
                 </ul>
             </div>
 
-            <div id="edit-menu" class="context-menu">
+            <div id="cell-menu" class="context-menu">
                 <ul>
                     <li data-action="delete">Delete</li>
                     <li data-action="flip">Flip</li>
                 </ul>
             </div>
 
-            <div id="edit-label-menu" class="context-menu">
+            <div id="label-menu" class="context-menu">
                 <ul>
-                    <li data-action="edit">Edit Text</li>
+                    <li data-action="delete">Delete</li>
+                    <li data-action="edit">Edit</li>
                 </ul>
             </div>
 
@@ -125,37 +126,27 @@
                Fibers which have a circle at the end are called <b>inhibitory</b> fibers. If a neuron receives an inhibitory signal, it will not fire, regardless of how many signals it receives.
             </p>
 
-            <ul>
-                <li><b>Create Neuron</b> Right click and select "New Neuron"</li>
-                <li><b>Move Neuron</b> Click and drag on a neuron.</li>
-                <li><b>Delete Neuron</b> Select a neuron and press the delete key.</li>
-                <li><b>Flip Neuron</b> Right click on a neuron and select "Flip".</li>
-                <li><b>Set Threshold</b> Select a neuron and press a number key (0-9).</li>
-                <li><b>Create Fiber</b> Hover near the outside of a cell. Click and drag to create a fiber.</li>
-                <li><b>Delete Fiber</b> Right click on a fiber and select "Delete".</li>
-                <li><b>Toggle Inhibit/Excite</b> Right click on a fiber and select "Toggle".</li>
-            </ul>
 
             <h2>Examples</h2>
 
-
-            In many of the examples, you need to get them started by turning on one of the input fibers by setting its threshold to 0. Most also come with a reset fiber which you can use to turn it off.
-
             <ul>
                 <li>
-                    <a href="?d=examples/memory_gate.net">Memory Gate</a>
-                    a switch which remembers when it has been turned on.
+                    <a href="?">Instructions (startup screen)</a>
                 </li>
                 <li>
+                    <a href="?d=examples/memory_gate.net">Memory Gate</a>
+                </li>
+
+                <li>
                     <a href="?d=examples/unary_scaler.net">Unary Scaler</a>
-                    produces one pulse for every N. However, it uses a lot of neurons.
                 </li>
                 <li><a href="?d=examples/binary_scaler.net">Binary Scaler</a>
-                    produces one pulse for every 2. But, it can be combined effeciently.
                 </li>
                  <li><a href="?d=examples/chained_scaler.net">Chained Scaler</a>
-                    produces one pulse for every 8. Chained binary scalar.
                 </li> 
+                <li>
+                    <a href="?d=examples/binary_adder.net">Binary Adder</a>
+                </li>
             </ul>
 
             You can share your own neural nets too! Copy the saved text to an online location (like a Gist)
@@ -193,6 +184,8 @@
 
             <p>
                 If you want to learn more, I recommend Marvin Minsky's book: <a href="https://dl.acm.org/citation.cfm?id=1095587">Computation: Finite &amp; Infinite</a>.
+                Also see <a href="http://www.alanturing.net/ace/index.html#section3figs">Turing's</a> diagrams
+                which use similar nets.
             </p>
         </div>
 
