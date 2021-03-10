@@ -237,15 +237,27 @@ function LabelView() {
 
 LabelView.radius = 25.0;
 
-LabelView.prototype.hits = function(mousePos, fontsize) {
-    var halflen = this.text.length/2.0;
-    var buffer = 3.0;
+//Determines a bounding box for a label
+//Label.pos is the center point of the text on the canvas
+//Therefore left is pos - half the width of the text
+// and top is pos - fontboundingboxascent
+LabelView.prototype.hits = function(mousePos, font, ctx) {
+    ctx.font = font;
+    var storedTextBaseline = ctx.textBaseline;
+    ctx.textBaseline = "middle";
+    var metrics = ctx.measureText(this.text);
+    var toTop = metrics.fontBoundingBoxAscent;
+    var toBot = metrics.fontBoundingBoxDescent;
+    var halflen = metrics.width/2.0;
+    var padding = 3.0;
     var min= new Vec(this.pos.x, this.pos.y);
     var max = new Vec(this.pos.x, this.pos.y);
-    min.x -= halflen*fontsize + buffer;
-    min.y -= (fontsize/2.0) + (buffer * 2);
-    max.x += halflen*fontsize + buffer;
-    max.y += (fontsize/2.0) + (buffer*2);
+    min.x -= halflen + padding;
+    min.y -= toTop + padding;
+    max.x += halflen + padding;
+    max.y += toBot + padding;
+    //restore textBaseline just in case
+    ctx.textBaseline = storedTextBaseline;
     return mousePos.inBounds(min, max);
 }
 
@@ -538,7 +550,7 @@ NetView.prototype.load = function(base64) {
     }
 
     if (read() !== d.length * 2) {
-        return SERIALIZATION_INVALID_LENGTH;
+     return SERIALIZATION_INVALID_LENGTH;
     }
 
     if (read() !== SERIALIZATION_VERSION) {
@@ -743,8 +755,8 @@ EditLabelTool.createTextInputElement = function(sim){
 };
 
 
-EditLabelTool.editLabel = function(sim, toEdit, newLoc) {
-    var input = EditLabelTool.createTextInputElement(sim);
+EditLabelTool.editLabel = function(sim, toEdit, newLoc, e) {
+    var input = EditLabelTool.createTextInputElement(sim, e);
     input.focus();
     input.addEventListener("focusout", function(){
         toEdit.text = input.value;
@@ -907,6 +919,7 @@ function Sim() {
 
     this.mousePos = new Vec(0, 0);
     this.fontsize = 14.0;
+    this.font = this.fontsize + 'pt monospace';
 
     this.playBtn = document.getElementById('play-btn');
     this.playBtn.onclick = this.togglePlay.bind(this);
@@ -987,9 +1000,10 @@ function Sim() {
             return cell.hits(mousePos);
         });
 
-        var fontsize = this.fontsize;
+        var font = this.font;
+        var ctx = this.ctx;
         var labelHit = this.net.labels.find(function (label) {
-            return label.hits(mousePos, fontsize);
+            return label.hits(mousePos, font, ctx);
         });
 
         if (hit) {
@@ -1110,9 +1124,10 @@ Sim.prototype.mouseDown = function(e) {
         return cell.hitsConnectors(mousePos);
     });
     
-    var fontSize = this.fontsize;
+    var font = this.font;
+    var ctx = this.ctx;
     var labelHit = this.net.labels.find(function (label) {
-        return label.hits(mousePos,fontSize);
+        return label.hits(mousePos,font, ctx);
     });
 
     if (hit) {
@@ -1189,7 +1204,7 @@ function drawSim(ctx, canvas, sim) {
     }
 
     drawHoverRing(ctx, sim.net, sim.mousePos);
-    drawTextLabels(ctx, sim.net, sim.fontsize);
+    drawTextLabels(ctx, sim.net, sim.font);
 }
 
 function clearCanvas(ctx, canvas) {
@@ -1240,8 +1255,8 @@ function drawSelectBox(ctx, selectTool, mousePos) {
     ctx.setLineDash([]);
 }
 
-function drawTextLabels(ctx, net, fontsize){
-    ctx.font =  fontsize + 'pt monospace';
+function drawTextLabels(ctx, net, font){
+    ctx.font =  font;
     ctx.fillStyle = '#000000';
     for(var i = 0; i < net.labels.length; i++){
         label = net.labels[i];
