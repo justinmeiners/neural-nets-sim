@@ -10,7 +10,7 @@ Pages from [Computation: finite and infinite machines](https://dl.acm.org/citati
 
 # License
 
-This code is licensed under [GPL v3.0](LICENSE).
+This code is licensed under [GPL v2](LICENSE.txt).
 
 # Neural Net List
 
