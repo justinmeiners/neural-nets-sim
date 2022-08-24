@@ -1453,6 +1453,8 @@ function drawCellFronts(ctx, net, active) {
     var cellFiring;
     var clockwise;
 
+    ctx.beginPath();
+
     for (i = 0; i < net.cells.length; ++i)  {
         cell = net.cells[i];
         clockwise = (cell.angle === ANGLE_EAST);
@@ -1462,62 +1464,49 @@ function drawCellFronts(ctx, net, active) {
             continue;
         }
 
-        ctx.beginPath();
+        ctx.moveTo(cell.pos.x, cell.pos.y + cell.radius);
         ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 0.5, Math.PI * 1.5, clockwise);
-        ctx.fill();
-        ctx.stroke();
     }
+
+    ctx.fill();
+    ctx.stroke();
 }
 
 // draws the path for half the cell
 // ctx options are used to configure front or back style
 function drawCellBacks(ctx, net) {
-    var i;
-    var cell;
-    var clockwise;
-
-    for (i = 0; i < net.cells.length; ++i)  {
-        cell = net.cells[i];
-        clockwise = cell.angle !== ANGLE_EAST;
-
-        ctx.beginPath();
+    ctx.beginPath();
+    net.cells.forEach(cell => {
+        var clockwise = cell.angle !== ANGLE_EAST;
+        ctx.moveTo(cell.pos.x, cell.pos.y + cell.radius);
         ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 0.5, Math.PI * 1.5, clockwise);
-        ctx.fill();
-        ctx.stroke();
-    }
+    });
+    ctx.fill();
+    ctx.stroke();
 }
 
 function drawCellArrows(ctx, net) {
-    var i;
-    var cell;
-    var dir;
-
-    for (i = 0; i < net.cells.length; ++i) {
-        cell = net.cells[i];
-        dir = Vec.fromAngle(cell.angle);
-
-        ctx.beginPath();
+    ctx.beginPath();
+    net.cells.forEach(cell => {
+        var dir = Vec.fromAngle(cell.angle);
         ctx.moveTo(cell.pos.x + dir.x * 4.0, cell.pos.y + cell.radius * 0.4);
         ctx.lineTo(cell.pos.x + dir.x * cell.radius * 0.6, cell.pos.y);
         ctx.lineTo(cell.pos.x + dir.x * 4.0, cell.pos.y - cell.radius * 0.4);
-        ctx.stroke();
-    }
+    });
+    ctx.stroke();
 }
 
 
-function drawCellSelection(ctx, net, sel, fontsize) {
-    var i;
-    var cell;
-
+function drawCellSelection(ctx, net, selection, fontsize) {
     ctx.lineWidth = 2;
-    for (i = 0; i < sel.length; ++i) {
-        if (sel[i] instanceof CellView) {
-            cell = sel[i];
-            ctx.beginPath();
+    ctx.beginPath();
+    selection.forEach(cell => {
+        if (cell instanceof CellView) {
+            ctx.moveTo(cell.pos.x + cell.radius, cell.pos.y);
             ctx.arc(cell.pos.x, cell.pos.y, cell.radius, Math.PI * 2.0, 0.0, false);
-            ctx.stroke();
         }
-    }
+    });
+    ctx.stroke();
     ctx.lineWidth = 1;
 }
 
@@ -1684,6 +1673,8 @@ function drawConnectorPaths(ctx, net, active) {
     var radius = 4.0;
     var origin;
 
+    ctx.beginPath();
+
     for (i = 0; i < net.fibers.length; ++i) {
         fiber = net.fibers[i];
         fiberActive = net.signals[fiber.index] ? true : false;
@@ -1695,10 +1686,11 @@ function drawConnectorPaths(ctx, net, active) {
             dir = Vec.fromAngle(fiber.to.angle);
             origin = Vec.add(p[3], Vec.scale(dir, -radius));
 
-            ctx.beginPath();
+            ctx.moveTo(origin.x + radius, origin.y);
             ctx.arc(origin.x, origin.y, radius, 0.0, Math.PI * 2.0, false);
-            ctx.fill();
-            ctx.stroke();
         }
     }
+
+    ctx.fill();
+    ctx.stroke();
 }
